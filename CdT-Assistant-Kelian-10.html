@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CdT Assistant – Kelian</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f5f4f0; font-family: 'Outfit', sans-serif; color: #1a1a1a; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #eeede9; }
+    ::-webkit-scrollbar-thumb { background: #c8c4bb; border-radius: 99px; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+    select option { background: #fff; color: #1a1a1a; }
+    input::placeholder, textarea::placeholder { color: #b0aca4; }
+    * { transition: border-color .15s, box-shadow .15s, background .15s; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const C = {
+  bg: "#f5f4f0", surface: "#ffffff", card: "#ffffff", border: "#e8e5df",
+  accent: "#1a1a1a", accentDim: "#e8e5df", text: "#1a1a1a",
+  muted: "#8c8880", green: "#2d7a4f", red: "#c0392b", blue: "#1d5fa6",
+  amber: "#b45309", tag: "#f0ede7",
+};
+
+const TABS = [
+  { id: "chantiers", label: "Chantiers", icon: "🏗️" },
+  { id: "cr", label: "CR Réunion", icon: "📋" },
+  { id: "calculs", label: "Calculs", icon: "📐" },
+  { id: "documents", label: "Documents", icon: "📁" },
+];
+
+const STATUS_COLORS = {
+  "En cours": C.green, "En attente": C.amber, "Terminé": C.blue, "Bloqué": C.red,
+};
+
+const AVANCEMENT = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+const INIT_CHANTIERS = [
+  { id: 1, nom: "Villa Les Garrigues", client: "M. Dupont", commune: "Nîmes", statut: "En cours", avancement: 65, phase: "Gros œuvre", notes: "" },
+  { id: 2, nom: "Maison Mas du Soleil", client: "Mme Fabre", commune: "Marguerittes", statut: "En cours", avancement: 30, phase: "Fondations", notes: "" },
+  { id: 3, nom: "Résidence Camargue", client: "SCI Terral", commune: "Milhaud", statut: "En attente", avancement: 0, phase: "Préparation", notes: "" },
+];
+
+// ── localStorage hook ──────────────────────────────────────────────────────
+function useLocalStorage(key, defaultValue) {
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : defaultValue;
+    } catch { return defaultValue; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }, [key, value]);
+  return [value, setValue];
+}
+
+// ── composants UI ──────────────────────────────────────────────────────────
+function Badge({ status }) {
+  return (
+    <span style={{
+      background: STATUS_COLORS[status] + "18", color: STATUS_COLORS[status],
+      border: `1px solid ${STATUS_COLORS[status]}30`,
+      borderRadius: 99, padding: "2px 11px", fontSize: 11, fontWeight: 600, letterSpacing: ".03em",
+    }}>{status}</span>
+  );
+}
+
+function ProgressBar({ value }) {
+  return (
+    <div style={{ background: "#eeede9", borderRadius: 99, height: 4, overflow: "hidden" }}>
+      <div style={{
+        height: "100%", width: `${value}%`, borderRadius: 99,
+        background: "linear-gradient(90deg, #1a1a1a, #555)",
+        transition: "width .5s cubic-bezier(.4,0,.2,1)",
+      }} />
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = "text", placeholder, style }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, ...style }}>
+      {label && <label style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase" }}>{label}</label>}
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ background: "#fff", border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, padding: "9px 13px", fontSize: 14, outline: "none", fontFamily: "inherit" }}
+        onFocus={e => { e.target.style.borderColor = "#1a1a1a"; e.target.style.boxShadow = "0 0 0 3px rgba(26,26,26,.07)"; }}
+        onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }}
+      />
+    </div>
+  );
+}
+
+function Textarea({ label, value, onChange, rows = 4, placeholder }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      {label && <label style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase" }}>{label}</label>}
+      <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} placeholder={placeholder}
+        style={{ background: "#fff", border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, padding: "9px 13px", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+        onFocus={e => { e.target.style.borderColor = "#1a1a1a"; e.target.style.boxShadow = "0 0 0 3px rgba(26,26,26,.07)"; }}
+        onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }}
+      />
+    </div>
+  );
+}
+
+function Select({ label, value, onChange, options }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      {label && <label style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase" }}>{label}</label>}
+      <select value={value} onChange={e => onChange(e.target.value)}
+        style={{ background: "#fff", border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, padding: "9px 13px", fontSize: 14, outline: "none", fontFamily: "inherit", cursor: "pointer" }}
+        onFocus={e => { e.target.style.borderColor = "#1a1a1a"; }}
+        onBlur={e => { e.target.style.borderColor = C.border; }}
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function Btn({ children, onClick, variant = "primary", small }) {
+  const styles = {
+    primary: { bg: "#1a1a1a", color: "#fff", border: "none", shadow: "0 1px 3px rgba(0,0,0,.18)" },
+    danger:  { bg: "#fff", color: C.red, border: `1.5px solid ${C.red}40`, shadow: "none" },
+    ghost:   { bg: "#fff", color: C.muted, border: `1.5px solid ${C.border}`, shadow: "none" },
+  };
+  const s = styles[variant] || styles.primary;
+  return (
+    <button onClick={onClick} style={{
+      background: s.bg, color: s.color, border: s.border || "none",
+      borderRadius: 10, padding: small ? "6px 14px" : "10px 22px",
+      fontWeight: 600, fontSize: small ? 12 : 13, cursor: "pointer",
+      fontFamily: "inherit", letterSpacing: ".02em", boxShadow: s.shadow,
+    }}
+      onMouseEnter={e => e.currentTarget.style.opacity = ".82"}
+      onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+    >{children}</button>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// TAB 1 — CHANTIERS (avec sauvegarde)
+// ══════════════════════════════════════════════════════════════════════════
+function TabChantiers() {
+  const [chantiers, setChantiers] = useLocalStorage("cdx_chantiers", INIT_CHANTIERS);
+  const [selected, setSelected] = useState(null);
+  const [form, setForm] = useState(null);
+  const [draft, setDraft] = useState({});
+
+  const openNew = () => {
+    setDraft({ nom: "", client: "", commune: "Nîmes", statut: "En attente", avancement: 0, phase: "Préparation", notes: "" });
+    setForm("new"); setSelected(null);
+  };
+  const openEdit = (c) => { setDraft({ ...c }); setForm(c.id); setSelected(c.id); };
+  const save = () => {
+    if (!draft.nom) return;
+    if (form === "new") setChantiers(prev => [{ ...draft, id: Date.now() }, ...prev]);
+    else setChantiers(prev => prev.map(c => c.id === form ? { ...draft } : c));
+    setForm(null);
+  };
+  const del = (id) => { setChantiers(prev => prev.filter(c => c.id !== id)); if (selected === id) setSelected(null); setForm(null); };
+  const sel = chantiers.find(c => c.id === selected);
+
+  const exportPDF = (c) => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const amber = [245, 158, 11];
+    const dark  = [30, 35, 51];
+    const light = [232, 234, 240];
+    const muted = [107, 114, 128];
+    const pageW = 210;
+    const margin = 18;
+    const contentW = pageW - margin * 2;
+
+    // ── fond header ──
+    doc.setFillColor(...dark);
+    doc.rect(0, 0, pageW, 38, "F");
+
+    // ── bande accent ──
+    doc.setFillColor(...amber);
+    doc.rect(0, 38, pageW, 2, "F");
+
+    // ── logo K ──
+    doc.setFillColor(...amber);
+    doc.roundedRect(margin, 9, 14, 14, 2, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text("K", margin + 7, 19, { align: "center" });
+
+    // ── titre ──
+    doc.setTextColor(...light);
+    doc.setFontSize(14);
+    doc.text("CdT Assistant – Fiche Chantier", margin + 18, 17);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text("Kelian · Conducteur de travaux · Nîmes", margin + 18, 24);
+
+    // ── date ──
+    const dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+    doc.setFontSize(8);
+    doc.text(dateStr, pageW - margin, 24, { align: "right" });
+
+    let y = 50;
+
+    // ── nom chantier ──
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(...light);
+    doc.text(c.nom, margin, y);
+    y += 7;
+
+    // ── client / commune ──
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...muted);
+    doc.text(`${c.client}  ·  ${c.commune}`, margin, y);
+    y += 10;
+
+    // ── badge statut ──
+    const statusColors = { "En cours": [34,197,94], "En attente": [245,158,11], "Terminé": [59,130,246], "Bloqué": [239,68,68] };
+    const sc = statusColors[c.statut] || amber;
+    doc.setFillColor(sc[0], sc[1], sc[2], 0.15);
+    doc.setDrawColor(...sc);
+    doc.roundedRect(margin, y, 32, 7, 1.5, 1.5, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...sc);
+    doc.text(c.statut, margin + 16, y + 4.8, { align: "center" });
+    y += 14;
+
+    // ── section helper ──
+    const section = (title) => {
+      doc.setFillColor(24, 28, 39);
+      doc.rect(margin, y, contentW, 7, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...amber);
+      doc.text(title.toUpperCase(), margin + 3, y + 5);
+      y += 11;
+    };
+
+    // ── row helper ──
+    const row = (label, value) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text(label, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...light);
+      doc.text(String(value), margin + 38, y);
+      y += 6;
+    };
+
+    // ── INFOS GÉNÉRALES ──
+    section("Informations générales");
+    row("Phase", c.phase);
+    row("Commune", c.commune);
+    row("Client", c.client);
+    row("Statut", c.statut);
+    y += 3;
+
+    // ── AVANCEMENT ──
+    section("Avancement");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text("Avancement global", margin, y);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...amber);
+    doc.text(`${c.avancement}%`, pageW - margin, y, { align: "right" });
+    y += 5;
+
+    // barre de progression
+    doc.setFillColor(42, 48, 69);
+    doc.roundedRect(margin, y, contentW, 5, 2, 2, "F");
+    if (c.avancement > 0) {
+      doc.setFillColor(...amber);
+      doc.roundedRect(margin, y, contentW * c.avancement / 100, 5, 2, 2, "F");
+    }
+    y += 12;
+
+    // ── NOTES ──
+    if (c.notes && c.notes.trim()) {
+      section("Notes & observations");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...light);
+      const lines = doc.splitTextToSize(c.notes, contentW);
+      doc.text(lines, margin, y);
+      y += lines.length * 5 + 4;
+    }
+
+    // ── footer ──
+    doc.setDrawColor(42, 48, 69);
+    doc.line(margin, 280, pageW - margin, 280);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text("Document généré par CdT Assistant – Kelian", margin, 285);
+    doc.text(`Page 1/1`, pageW - margin, 285, { align: "right" });
+
+    doc.save(`Chantier_${c.nom.replace(/\s+/g,"_")}.pdf`);
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, height: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: C.muted, fontSize: 12, fontWeight: 500, letterSpacing: ".04em", textTransform: "uppercase" }}>{chantiers.length} chantier{chantiers.length > 1 ? "s" : ""}</span>
+          <Btn small onClick={openNew}>+ Nouveau</Btn>
+        </div>
+        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          {chantiers.map(c => (
+            <div key={c.id} onClick={() => { setSelected(c.id); setForm(null); }}
+              style={{ background: "#fff", border: `1.5px solid ${selected === c.id ? "#1a1a1a" : C.border}`, borderRadius: 12, padding: "14px 16px", cursor: "pointer", boxShadow: selected === c.id ? "0 2px 12px rgba(0,0,0,.08)" : "0 1px 3px rgba(0,0,0,.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>{c.nom}</span>
+                <Badge status={c.statut} />
+              </div>
+              <div style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>{c.client} · {c.commune}</div>
+              <ProgressBar value={c.avancement} />
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                <span style={{ color: C.muted, fontSize: 11 }}>{c.phase}</span>
+                <span style={{ color: "#1a1a1a", fontSize: 11, fontWeight: 700 }}>{c.avancement}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 14, padding: 22, border: `1px solid ${C.border}`, overflowY: "auto", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+        {form !== null ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <h3 style={{ margin: 0, color: "#1a1a1a", fontSize: 14, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase" }}>{form === "new" ? "Nouveau chantier" : "Modifier"}</h3>
+            <Input label="Nom du chantier" value={draft.nom} onChange={v => setDraft(d => ({ ...d, nom: v }))} placeholder="Villa Les Garrigues" />
+            <Input label="Client" value={draft.client} onChange={v => setDraft(d => ({ ...d, client: v }))} placeholder="M. / Mme ..." />
+            <Input label="Commune" value={draft.commune} onChange={v => setDraft(d => ({ ...d, commune: v }))} />
+            <Select label="Statut" value={draft.statut} onChange={v => setDraft(d => ({ ...d, statut: v }))} options={Object.keys(STATUS_COLORS)} />
+            <Select label="Phase" value={draft.phase} onChange={v => setDraft(d => ({ ...d, phase: v }))}
+              options={["Préparation","Terrassement","Fondations","Gros œuvre","Charpente","Couverture","Cloisons","Second œuvre","Finitions","Livraison"]} />
+            <Select label={`Avancement : ${draft.avancement}%`} value={String(draft.avancement)}
+              onChange={v => setDraft(d => ({ ...d, avancement: Number(v) }))} options={AVANCEMENT.map(String)} />
+            <Textarea label="Notes" value={draft.notes} onChange={v => setDraft(d => ({ ...d, notes: v }))} rows={3} placeholder="Observations, points de vigilance..." />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn onClick={save}>Enregistrer</Btn>
+              <Btn variant="ghost" onClick={() => setForm(null)}>Annuler</Btn>
+              {form !== "new" && <Btn variant="danger" onClick={() => del(form)}>Supprimer</Btn>}
+            </div>
+          </div>
+        ) : sel ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h2 style={{ margin: 0, color: "#1a1a1a", fontSize: 20, fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{sel.nom}</h2>
+                <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{sel.client} · {sel.commune}</div>
+              </div>
+              <Badge status={sel.statut} />
+            </div>
+            <div style={{ background: "#f5f4f0", borderRadius: 10, padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ color: C.muted, fontSize: 12, fontWeight: 500 }}>Avancement global</span>
+                <span style={{ color: "#1a1a1a", fontWeight: 700, fontSize: 13 }}>{sel.avancement}%</span>
+              </div>
+              <ProgressBar value={sel.avancement} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[["Phase", sel.phase], ["Commune", sel.commune]].map(([k, v]) => (
+                <div key={k} style={{ background: "#f5f4f0", borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", marginBottom: 4 }}>{k}</div>
+                  <div style={{ color: "#1a1a1a", fontWeight: 600, fontSize: 14 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            {sel.notes && (
+              <div style={{ background: "#f5f4f0", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", marginBottom: 6 }}>Notes</div>
+                <div style={{ color: "#1a1a1a", fontSize: 13, lineHeight: 1.6 }}>{sel.notes}</div>
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn small onClick={() => openEdit(sel)}>✏️ Modifier</Btn>
+              <Btn small variant="ghost" onClick={() => exportPDF(sel)}>📄 Exporter PDF</Btn>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: C.muted, textAlign: "center", marginTop: 60, fontSize: 14 }}>
+            Sélectionne un chantier<br />ou crée-en un nouveau
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// TAB 2 — CR RÉUNION
+// ══════════════════════════════════════════════════════════════════════════
+function TabCR() {
+  const today = new Date().toISOString().split("T")[0];
+  const [cr, setCr] = useState({
+    chantier: "", date: today, maitriseOuvrage: "", conducteurTravaux: "Kelian",
+    presentsEntreprises: "", presentsClient: "", avancement: "", pointsAvalides: "",
+    problemes: "", decisionsRetenues: "", reservesLevees: "", reservesNouvelles: "", prochainRdv: "",
+  });
+  const [output, setOutput] = useState("");
+
+  const generate = () => {
+    const d = new Date(cr.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+    setOutput(`COMPTE-RENDU DE RÉUNION DE CHANTIER
+════════════════════════════════════════
+
+Chantier     : ${cr.chantier}
+Date         : ${d}
+Conducteur   : ${cr.conducteurTravaux}
+Maîtrise d'ouvrage : ${cr.maitriseOuvrage}
+
+PRÉSENTS
+————————————————————————————————————————
+Entreprises  : ${cr.presentsEntreprises}
+Client       : ${cr.presentsClient}
+
+1. AVANCEMENT DES TRAVAUX
+————————————————————————————————————————
+${cr.avancement}
+
+2. POINTS VALIDÉS
+————————————————————————————————————————
+${cr.pointsAvalides}
+
+3. PROBLÈMES / POINTS DE VIGILANCE
+————————————————————————————————————————
+${cr.problemes}
+
+4. DÉCISIONS RETENUES
+————————————————————————————————————————
+${cr.decisionsRetenues}
+
+5. RÉSERVES
+————————————————————————————————————————
+Levées    : ${cr.reservesLevees || "Aucune"}
+Nouvelles : ${cr.reservesNouvelles || "Aucune"}
+
+6. PROCHAIN RDV DE CHANTIER
+————————————————————————————————————————
+${cr.prochainRdv}
+
+────────────────────────────────────────
+Document établi par ${cr.conducteurTravaux} – ${d}`);
+  };
+
+  const copy = () => { navigator.clipboard.writeText(output).catch(() => {}); };
+
+  const F = (k, label, placeholder, comp = "input", rows) => comp === "textarea"
+    ? <Textarea key={k} label={label} value={cr[k]} onChange={v => setCr(c => ({ ...c, [k]: v }))} rows={rows || 3} placeholder={placeholder} />
+    : <Input key={k} label={label} value={cr[k]} onChange={v => setCr(c => ({ ...c, [k]: v }))} placeholder={placeholder} />;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, height: "100%" }}>
+      <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, background: "#fff", borderRadius: 14, padding: 20, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+        <h3 style={{ margin: 0, color: "#1a1a1a", fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase" }}>Informations générales</h3>
+        {F("chantier", "Chantier", "Nom du chantier")}
+        <Input label="Date" value={cr.date} onChange={v => setCr(c => ({ ...c, date: v }))} type="date" />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input label="Conducteur" value={cr.conducteurTravaux} onChange={v => setCr(c => ({ ...c, conducteurTravaux: v }))} />
+          <Input label="Maîtrise d'ouvrage" value={cr.maitriseOuvrage} onChange={v => setCr(c => ({ ...c, maitriseOuvrage: v }))} placeholder="MO" />
+        </div>
+        <Textarea label="Entreprises présentes" value={cr.presentsEntreprises} onChange={v => setCr(c => ({ ...c, presentsEntreprises: v }))} rows={2} placeholder="Maçon, charpentier..." />
+        <Textarea label="Client présent" value={cr.presentsClient} onChange={v => setCr(c => ({ ...c, presentsClient: v }))} rows={1} placeholder="M. Dupont" />
+        <div style={{ height: 1, background: C.border, margin: "4px 0" }} />
+        <h3 style={{ margin: 0, color: "#1a1a1a", fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase" }}>Contenu</h3>
+        {F("avancement", "Avancement des travaux", "État d'avancement...", "textarea", 3)}
+        {F("pointsAvalides", "Points validés", "CE, plans, choix matériaux...", "textarea", 3)}
+        {F("problemes", "Problèmes / points de vigilance", "Intempéries, retards...", "textarea", 3)}
+        {F("decisionsRetenues", "Décisions retenues", "Modifications, arbitrages...", "textarea", 3)}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Textarea label="Réserves levées" value={cr.reservesLevees} onChange={v => setCr(c => ({ ...c, reservesLevees: v }))} rows={2} />
+          <Textarea label="Réserves nouvelles" value={cr.reservesNouvelles} onChange={v => setCr(c => ({ ...c, reservesNouvelles: v }))} rows={2} />
+        </div>
+        {F("prochainRdv", "Prochain RDV", "Jeudi 15 mai à 9h00")}
+        <Btn onClick={generate}>📄 Générer le CR</Btn>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ color: "#1a1a1a", fontWeight: 600, fontSize: 13, letterSpacing: ".01em" }}>Prévisualisation</span>
+          {output && <Btn small onClick={copy}>📋 Copier</Btn>}
+        </div>
+        <pre style={{ flex: 1, overflowY: "auto", margin: 0, padding: 18, color: output ? "#1a1a1a" : C.muted, fontSize: 12, lineHeight: 1.8, fontFamily: "'Courier New', monospace", whiteSpace: "pre-wrap", background: "#fafaf8", borderRadius: "0 0 14px 14px" }}>
+          {output || "Remplis le formulaire et clique sur\n« Générer le CR » pour voir le résultat."}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// TAB 3 — CALCULS PAR CORPS D'ÉTAT
+// ══════════════════════════════════════════════════════════════════════════
+
+const CORPS = [
+  { id: "go",        label: "Gros Œuvre",          icon: "🧱" },
+  { id: "charpente", label: "Charpente / Couverture", icon: "🏠" },
+  { id: "carrelage", label: "Carrelage",             icon: "🪟" },
+  { id: "enduit",    label: "Enduit / Crépi",        icon: "🪣" },
+];
+
+// ── helpers partagés ───────────────────────────────────────────────────────
+function ResultBox({ result }) {
+  if (!result) return null;
+  return (
+    <div style={{ background: "#f5f4f0", borderRadius: 10, padding: "12px 14px", border: `1px solid ${C.border}` }}>
+      {Object.entries(result).map(([k, v], i, arr) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none" }}>
+          <span style={{ color: C.muted, fontSize: 12, fontWeight: 500 }}>{k}</span>
+          <span style={{ color: "#1a1a1a", fontWeight: 700, fontSize: 13 }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CalcCard({ title, children }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, padding: 20, border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: ".07em", textTransform: "uppercase", paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function SubToggle({ options, value, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 4, background: "#f5f4f0", borderRadius: 10, padding: 4, marginBottom: 4 }}>
+      {options.map(([id, label]) => (
+        <button key={id} onClick={() => onChange(id)} style={{
+          flex: 1, background: value === id ? "#fff" : "transparent", color: value === id ? "#1a1a1a" : C.muted,
+          border: "none", borderRadius: 8, padding: "6px 8px", fontSize: 12,
+          fontWeight: value === id ? 600 : 400, cursor: "pointer", fontFamily: "inherit",
+          boxShadow: value === id ? "0 1px 3px rgba(0,0,0,.08)" : "none",
+        }}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+// ── GROS ŒUVRE ────────────────────────────────────────────────────────────
+function CalcGO() {
+  const [sub, setSub] = useState("agglos");
+
+  // Agglos
+  const FORMATS_AGGLO = {
+    "50×20×20 (standard)": { L:500,H:200,ep:200,pal:60,joint:10 },
+    "50×25×20":            { L:500,H:250,ep:200,pal:48,joint:10 },
+    "50×20×15":            { L:500,H:200,ep:150,pal:80,joint:10 },
+    "50×20×10":            { L:500,H:200,ep:100,pal:120,joint:10 },
+  };
+  const [fmtAgglo, setFmtAgglo] = useState("50×20×20 (standard)");
+  const [vAgglo, setVAgglo] = useState({});
+  const [ouvs, setOuvs] = useState([{ id:1, label:"Porte/fenêtre", L:"", H:"" }]);
+  const [resAgglo, setResAgglo] = useState(null);
+
+  const calcAgglo = () => {
+    const f = FORMATS_AGGLO[fmtAgglo];
+    const bL = (f.L + f.joint) / 1000, bH = (f.H + f.joint) / 1000;
+    const u_m2 = 1 / (bL * bH);
+    const surfB = parseFloat(vAgglo.L||0) * parseFloat(vAgglo.H||0);
+    const surfO = ouvs.reduce((s,o) => s + parseFloat(o.L||0)*parseFloat(o.H||0), 0);
+    const surfN = Math.max(0, surfB - surfO);
+    const qNet = Math.ceil(surfN * u_m2);
+    const qTot = Math.ceil(qNet * 1.05);
+    const palEnt = Math.floor(qTot / f.pal), palRest = qTot % f.pal;
+    const palLabel = palRest > 0 ? `${palEnt} palette${palEnt>1?"s":""} + ${palRest} agglo${palRest>1?"s":""}` : `${palEnt} palette${palEnt>1?"s":""} pile`;
+    setResAgglo({ "Surface brute": `${surfB.toFixed(2)} m²`, "Surface ouvertures": `${surfO.toFixed(2)} m²`, "Surface nette": `${surfN.toFixed(2)} m²`, "Agglos nets": `${qNet} u`, "Agglos +5% casse": `${qTot} u`, [`Palettes (${f.pal} u/pal)`]: palLabel });
+  };
+
+  // Béton / Poteau circulaire
+  const [vBeton, setVBeton] = useState({});
+  const [typeBeton, setTypeBeton] = useState("Semelle filante");
+  const [resBeton, setResBeton] = useState(null);
+  const BETON_CONFIGS = {
+    "Semelle filante":  { fields:[["L","Longueur (m)"],["l","Largeur (m)"],["h","Hauteur (m)"]], calc: v => ({ "Volume béton": `${(v.L*v.l*v.h).toFixed(2)} m³` }) },
+    "Dalle / Radier":   { fields:[["L","Longueur (m)"],["l","Largeur (m)"],["e","Épaisseur (m)"]], calc: v => ({ "Volume béton": `${(v.L*v.l*v.e).toFixed(2)} m³` }) },
+    "Poteau carré":     { fields:[["a","Côté (m)"],["h","Hauteur (m)"],["n","Nombre"]], calc: v => ({ "Volume béton total": `${(v.a*v.a*v.h*v.n).toFixed(2)} m³` }) },
+    "Poteau circulaire":{ fields:[["d","Diamètre (m)"],["h","Hauteur (m)"],["n","Nombre"]], calc: v => ({ "Volume béton total": `${(Math.PI*(v.d/2)**2*v.h*v.n).toFixed(2)} m³` }) },
+    "Terrassement":     { fields:[["L","Longueur (m)"],["l","Largeur (m)"],["p","Profondeur (m)"]], calc: v => ({ "Volume fouille": `${(v.L*v.l*v.p).toFixed(2)} m³`, "Remblai ×1.3": `${(v.L*v.l*v.p*1.3).toFixed(2)} m³` }) },
+  };
+  const bcConf = BETON_CONFIGS[typeBeton];
+  const calcBeton = () => {
+    const vals = Object.fromEntries(bcConf.fields.map(([k]) => [k, parseFloat(vBeton[k]||0)]));
+    setResBeton(bcConf.calc(vals));
+  };
+
+  // Sable / Granulats
+  const GRANULATS = {
+    "Sable 0/2 (fin)":         1.50,
+    "Sable 0/4 (maçonnerie)":  1.55,
+    "Sable 0/4 concassé":      1.65,
+    "Grave 0/20":              1.80,
+    "Grave 0/31,5":            1.85,
+    "Tout-venant 0/80":        1.90,
+  };
+  const [granulat, setGranulat] = useState("Sable 0/4 (maçonnerie)");
+  const [modeG, setModeG] = useState("surface");
+  const [vGran, setVGran] = useState({});
+  const [resGran, setResGran] = useState(null);
+  const calcGran = () => {
+    const mv = GRANULATS[granulat];
+    const vol = modeG === "surface" ? parseFloat(vGran.L||0)*parseFloat(vGran.l||0)*(parseFloat(vGran.e||0)/100) : parseFloat(vGran.vol||0);
+    const volCmd = vol * 1.15;
+    setResGran({ "Volume compacté": `${vol.toFixed(2)} m³`, "Volume à commander +15%": `${volCmd.toFixed(2)} m³`, "Tonnage net": `${(vol*mv).toFixed(2)} t`, "Tonnage à commander": `${(volCmd*mv).toFixed(2)} t` });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* AGGLOS */}
+      <CalcCard title="Agglos — Quantité & Palettes">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Select label="Format" value={fmtAgglo} onChange={v => { setFmtAgglo(v); setResAgglo(null); }} options={Object.keys(FORMATS_AGGLO)} />
+          <div style={{ background: "#f5f4f0", borderRadius: 10, padding: "9px 13px", fontSize: 12, color: C.muted, display:"flex", alignItems:"center" }}>
+            {(() => { const f=FORMATS_AGGLO[fmtAgglo]; return `${f.L}×${f.H}×${f.ep} mm · ${f.pal} u/pal`; })()}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input label="Longueur mur (m)" value={vAgglo.L||""} onChange={v => setVAgglo(p=>({...p,L:v}))} type="number" placeholder="12" />
+          <Input label="Hauteur mur (m)"  value={vAgglo.H||""} onChange={v => setVAgglo(p=>({...p,H:v}))} type="number" placeholder="2.50" />
+        </div>
+        <div style={{ display: "flex", flexDirection:"column", gap:6 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <label style={{ fontSize:11, color:C.muted, fontWeight:600, letterSpacing:".07em", textTransform:"uppercase" }}>Ouvertures</label>
+            <button onClick={() => setOuvs(p=>[...p,{id:Date.now(),label:"Ouverture",L:"",H:""}])} style={{ background:"#fff", border:`1.5px solid ${C.border}`, color:"#1a1a1a", borderRadius:8, padding:"3px 12px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>+ Ajouter</button>
+          </div>
+          {ouvs.map(o => (
+            <div key={o.id} style={{ display:"flex", gap:6, alignItems:"center" }}>
+              <input value={o.label} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,label:e.target.value}:x))} style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:12, width:100, fontFamily:"inherit", outline:"none" }} />
+              <input type="number" value={o.L} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,L:e.target.value}:x))} placeholder="L (m)" style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:12, width:65, fontFamily:"inherit", outline:"none" }} />
+              <input type="number" value={o.H} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,H:e.target.value}:x))} placeholder="H (m)" style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:12, width:65, fontFamily:"inherit", outline:"none" }} />
+              <button onClick={() => setOuvs(p=>p.filter(x=>x.id!==o.id))} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:18 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={calcAgglo} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resAgglo} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ +5% casse inclus. Vérifier le nombre d'unités/palette avec votre fournisseur.</div>
+      </CalcCard>
+
+      {/* BÉTON */}
+      <CalcCard title="Béton — Volumes">
+        <Select label="Type d'ouvrage" value={typeBeton} onChange={v => { setTypeBeton(v); setVBeton({}); setResBeton(null); }} options={Object.keys(BETON_CONFIGS)} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {bcConf.fields.map(([k, label]) => (
+            <Input key={k} label={label} value={vBeton[k]||""} onChange={v => setVBeton(p=>({...p,[k]:v}))} type="number" placeholder="0" />
+          ))}
+        </div>
+        <button onClick={calcBeton} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resBeton} />
+      </CalcCard>
+
+      {/* SABLE & GRANULATS */}
+      <CalcCard title="Sable & Granulats — Tonnage">
+        <SubToggle options={[["surface","📐 Surface + épaisseur"],["volume","📦 Volume connu"]]} value={modeG} onChange={v => { setModeG(v); setVGran({}); setResGran(null); }} />
+        <Select label="Type de granulat" value={granulat} onChange={v => { setGranulat(v); setResGran(null); }} options={Object.keys(GRANULATS)} />
+        <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
+          Masse volumique : <strong style={{ color:"#1a1a1a" }}>{GRANULATS[granulat]} t/m³</strong>
+        </div>
+        {modeG === "surface" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <Input label="Longueur (m)" value={vGran.L||""} onChange={v => setVGran(p=>({...p,L:v}))} type="number" placeholder="0" />
+            <Input label="Largeur (m)"  value={vGran.l||""} onChange={v => setVGran(p=>({...p,l:v}))} type="number" placeholder="0" />
+            <Input label="Épaisseur (cm)" value={vGran.e||""} onChange={v => setVGran(p=>({...p,e:v}))} type="number" placeholder="10" />
+          </div>
+        ) : (
+          <Input label="Volume (m³)" value={vGran.vol||""} onChange={v => setVGran(p=>({...p,vol:v}))} type="number" placeholder="0" />
+        )}
+        <button onClick={calcGran} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resGran} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ +15% foisonnement livraison inclus.</div>
+      </CalcCard>
+    </div>
+  );
+}
+
+// ── CHARPENTE / COUVERTURE ─────────────────────────────────────────────────
+function CalcCharpente() {
+  // Tuiles
+  const TUILES = {
+    "Tuile canal (30 u/m²)":     { u_m2: 30, pal: 200 },
+    "Tuile romane (15 u/m²)":    { u_m2: 15, pal: 180 },
+    "Tuile mécanique (12 u/m²)": { u_m2: 12, pal: 144 },
+    "Tuile plate (60 u/m²)":     { u_m2: 60, pal: 250 },
+    "Ardoise (25 u/m²)":         { u_m2: 25, pal: 300 },
+  };
+  const [typeTuile, setTypeTuile] = useState("Tuile canal (30 u/m²)");
+  const [vTuile, setVTuile] = useState({});
+  const [resTuile, setResTuile] = useState(null);
+  const calcTuile = () => {
+    const f = TUILES[typeTuile];
+    // Toiture 2 pans
+    const L = parseFloat(vTuile.L||0), l = parseFloat(vTuile.l||0), h = parseFloat(vTuile.h||0);
+    const ramp = Math.sqrt((l/2)**2 + h**2);
+    const surf = 2 * L * ramp;
+    const qNet = Math.ceil(surf * f.u_m2);
+    const qTot = Math.ceil(qNet * 1.05);
+    const palEnt = Math.floor(qTot / f.pal), palRest = qTot % f.pal;
+    const palLabel = palRest > 0 ? `${palEnt} pal. + ${palRest} u` : `${palEnt} palette${palEnt>1?"s":""} pile`;
+    setResTuile({ "Longueur rampant": `${ramp.toFixed(2)} m`, "Surface toiture": `${surf.toFixed(2)} m²`, "Tuiles nettes": `${qNet} u`, "Tuiles +5% casse": `${qTot} u`, [`Palettes (${f.pal} u/pal)`]: palLabel });
+  };
+
+  // Faîtières
+  const [vFait, setVFait] = useState({});
+  const [resFait, setResFait] = useState(null);
+  const calcFait = () => {
+    // Faîtière canal : ~3 pièces/ml, faîtière mécanique : ~4 pièces/ml
+    const L = parseFloat(vFait.L||0);
+    const pml = parseFloat(vFait.pml||3); // pièces par mètre linéaire
+    const nb = Math.ceil(L * pml * 1.05);
+    setResFait({
+      "Longueur faîtière": `${L.toFixed(2)} m`,
+      "Faîtières nettes": `${Math.ceil(L * pml)} u`,
+      "Faîtières +5% casse": `${nb} u`,
+    });
+  };
+
+  // Tuiles de rive gauche / droite
+  const [vRive, setVRive] = useState({});
+  const [resRive, setResRive] = useState(null);
+  const calcRive = () => {
+    const ramp = Math.sqrt((parseFloat(vTuile.l||vRive.l||0)/2)**2 + parseFloat(vTuile.h||vRive.h||0)**2);
+    const Lr = ramp || parseFloat(vRive.ramp||0);
+    const pml = parseFloat(vRive.pml||4); // pièces par mètre linéaire (tuile mécanique ≈ 4/ml)
+    const nbParRive = Math.ceil(Lr * pml * 1.05);
+    setResRive({
+      "Longueur rampant": `${Lr.toFixed(2)} m`,
+      "Tuiles rive / côté +5%": `${nbParRive} u`,
+      "Total rive gauche + droite": `${nbParRive * 2} u (× 2 pans)`,
+    });
+  };
+
+  // Génoise
+  const [vGen, setVGen] = useState({});
+  const [resGen, setResGen] = useState(null);
+  const calcGen = () => {
+    const perim = parseFloat(vGen.perim||0);
+    const rangs = parseInt(vGen.rangs||2);
+    // Tuile canal : ~8 u/ml pour génoise à 2 rangs (3 pièces couvrant + 3 dessous par ml × rangs)
+    const uml = 5 * rangs; // ~5 u/ml/rang
+    const nbNet = Math.ceil(perim * uml);
+    const nbCmd = Math.ceil(nbNet * 1.08);
+    setResGen({
+      "Périmètre débord": `${perim.toFixed(2)} m`,
+      "Nombre de rangs": `${rangs}`,
+      "Tuiles génoises nettes": `${nbNet} u`,
+      "Tuiles génoises +8% casse": `${nbCmd} u`,
+    });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      <CalcCard title="Tuiles courantes — Quantité & Palettes">
+        <Select label="Type de tuile" value={typeTuile} onChange={v => { setTypeTuile(v); setResTuile(null); }} options={Object.keys(TUILES)} />
+        <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
+          Densité : <strong style={{ color:"#1a1a1a" }}>{TUILES[typeTuile].u_m2} u/m²</strong> · {TUILES[typeTuile].pal} u/palette
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <Input label="Longueur faîtière (m)" value={vTuile.L||""} onChange={v => setVTuile(p=>({...p,L:v}))} type="number" placeholder="10" />
+          <Input label="Largeur hors tout (m)" value={vTuile.l||""} onChange={v => setVTuile(p=>({...p,l:v}))} type="number" placeholder="8" />
+          <Input label="Hauteur faîtage (m)"   value={vTuile.h||""} onChange={v => setVTuile(p=>({...p,h:v}))} type="number" placeholder="2" />
+        </div>
+        <button onClick={calcTuile} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resTuile} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ Toiture 2 pans. +5% casse inclus.</div>
+      </CalcCard>
+
+      <CalcCard title="Tuiles faîtières">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input label="Longueur du faîtage (m)" value={vFait.L||""} onChange={v => setVFait(p=>({...p,L:v}))} type="number" placeholder="10" />
+          <Input label="Pièces par mètre linéaire" value={vFait.pml||""} onChange={v => setVFait(p=>({...p,pml:v}))} type="number" placeholder="3 (canal) / 4 (méca)" />
+        </div>
+        <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
+          Tuile canal ≈ <strong style={{color:"#1a1a1a"}}>3 u/ml</strong> · Tuile mécanique ≈ <strong style={{color:"#1a1a1a"}}>4 u/ml</strong>
+        </div>
+        <button onClick={calcFait} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resFait} />
+      </CalcCard>
+
+      <CalcCard title="Tuiles de rive (gauche & droite)">
+        <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}`, marginBottom:4 }}>
+          Si tu as déjà renseigné la largeur et hauteur dans « Tuiles courantes », la longueur du rampant est reprise automatiquement.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input label="Largeur hors tout (m) — si différente" value={vRive.l||""} onChange={v => setVRive(p=>({...p,l:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
+          <Input label="Hauteur faîtage (m) — si différente"   value={vRive.h||""} onChange={v => setVRive(p=>({...p,h:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
+          <Input label="Longueur rampant (m) — optionnel"       value={vRive.ramp||""} onChange={v => setVRive(p=>({...p,ramp:v}))} type="number" placeholder="Si connu directement" />
+          <Input label="Pièces par mètre linéaire"              value={vRive.pml||""} onChange={v => setVRive(p=>({...p,pml:v}))} type="number" placeholder="4" />
+        </div>
+        <button onClick={calcRive} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resRive} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ +5% casse inclus. Résultat donné par rive puis total gauche + droite.</div>
+      </CalcCard>
+
+      <CalcCard title="Génoise (tuiles canal)">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input label="Périmètre de la génoise (m)" value={vGen.perim||""} onChange={v => setVGen(p=>({...p,perim:v}))} type="number" placeholder="Ex : 42" />
+          <Select label="Nombre de rangs" value={vGen.rangs||"2"} onChange={v => setVGen(p=>({...p,rangs:v}))} options={["1","2","3","4"]} />
+        </div>
+        <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
+          Génoise à {vGen.rangs||2} rang{(vGen.rangs||2)>1?"s":""} ≈ <strong style={{color:"#1a1a1a"}}>{5*(parseInt(vGen.rangs||2))} u/ml</strong> (tuile canal)
+        </div>
+        <button onClick={calcGen} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resGen} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ +8% casse inclus (pose en biais plus exigeante). Densité basée sur tuile canal — vérifier avec votre fournisseur.</div>
+      </CalcCard>
+    </div>
+  );
+}
+
+// ── CARRELAGE ─────────────────────────────────────────────────────────────
+function CalcCarrelage() {
+  const [vCarr, setVCarr] = useState({});
+  const [formatCarr, setFormatCarr] = useState("60×60");
+  const [resCarr, setResCarr] = useState(null);
+  const [resSable, setResSable] = useState(null);
+  const [resCiment, setResCiment] = useState(null);
+  const [resColle, setResColle] = useState(null);
+  const [typeColle, setTypeColle] = useState("Colle C1 (3 kg/m²)");
+
+  const FORMATS_CARR = { "30×30": 0.09, "40×40": 0.16, "60×60": 0.36, "80×80": 0.64, "120×60": 0.72 };
+  const COLLES = { "Colle C1 (3 kg/m²)": 3, "Colle C2 (4 kg/m²)": 4, "Colle flex (5 kg/m²)": 5 };
+  // Sac de colle = 25 kg
+
+  const calc = () => {
+    const L = parseFloat(vCarr.L||0), l = parseFloat(vCarr.l||0);
+    const surf = L * l;
+    const surfCmd = surf * 1.10; // +10% chutes
+    const u_m2 = 1 / FORMATS_CARR[formatCarr];
+    const nbCarreaux = Math.ceil(surfCmd * u_m2);
+
+    // Chape / lit de pose : sable 0/4 + ciment (dosage 400 kg/m³, épaisseur 3cm)
+    const eChape = parseFloat(vCarr.eChape || 3) / 100;
+    const volChape = surf * eChape;
+    const tonneSable = parseFloat((volChape * 1.55 * 0.75).toFixed(2)); // 75% sable
+    const nbSacCiment = Math.ceil(volChape * 400 / 35); // sac 35kg
+
+    // Colle
+    const kgColle = surf * COLLES[typeColle];
+    const nbSacColle = Math.ceil(kgColle / 25);
+
+    // Joints (sac 5kg couvre ~5 m²)
+    const nbSacJoint = Math.ceil(surf / 5);
+
+    setResCarr({ "Surface brute": `${surf.toFixed(2)} m²`, "Surface à commander (+10%)": `${surfCmd.toFixed(2)} m²`, "Nombre de carreaux": `${nbCarreaux} u` });
+    setResSable({ "Épaisseur chape": `${(eChape*100).toFixed(0)} cm`, "Sable 0/4 chape": `${tonneSable} t`, "Sacs ciment 35kg": `${nbSacCiment} sacs` });
+    setResColle({ "Colle nécessaire": `${kgColle.toFixed(0)} kg`, "Sacs de colle 25kg": `${nbSacColle} sacs`, "Sacs de joint 5kg": `${nbSacJoint} sacs` });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <CalcCard title="Surface & Carreaux">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <Input label="Longueur (m)" value={vCarr.L||""} onChange={v => setVCarr(p=>({...p,L:v}))} type="number" placeholder="8" />
+          <Input label="Largeur (m)"  value={vCarr.l||""} onChange={v => setVCarr(p=>({...p,l:v}))} type="number" placeholder="5" />
+          <Select label="Format carreau" value={formatCarr} onChange={v => setFormatCarr(v)} options={Object.keys(FORMATS_CARR)} />
+        </div>
+        <ResultBox result={resCarr} />
+      </CalcCard>
+
+      <CalcCard title="Chape de pose — Sable & Ciment">
+        <Input label="Épaisseur chape (cm)" value={vCarr.eChape||""} onChange={v => setVCarr(p=>({...p,eChape:v}))} type="number" placeholder="3" />
+        <ResultBox result={resSable} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ Dosage 400 kg ciment/m³, sable 0/4 – ratio 75%.</div>
+      </CalcCard>
+
+      <CalcCard title="Colle & Joints">
+        <Select label="Type de colle" value={typeColle} onChange={v => setTypeColle(v)} options={Object.keys(COLLES)} />
+        <ResultBox result={resColle} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ Sacs de colle 25 kg, sacs de joint 5 kg (~5 m²/sac).</div>
+      </CalcCard>
+
+      <button onClick={calc} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"11px 26px", fontWeight:600, fontSize:14, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start", boxShadow:"0 1px 4px rgba(0,0,0,.15)" }}>
+        Tout calculer
+      </button>
+    </div>
+  );
+}
+
+// ── ENDUIT / CRÉPI ────────────────────────────────────────────────────────
+function CalcEnduit() {
+  const ENDUITS = {
+    "Enduit traditionnel 3 couches (20 kg/m²)": { conso: 20, sac: 25 },
+    "Enduit monocouche (12 kg/m²)":             { conso: 12, sac: 25 },
+    "Crépi projeté (8 kg/m²)":                  { conso: 8,  sac: 25 },
+    "Enduit de finition (3 kg/m²)":             { conso: 3,  sac: 25 },
+    "Enduit hydraulique (15 kg/m²)":            { conso: 15, sac: 30 },
+  };
+  // Sable : 1 m² enduit 20 mm ≈ 30 kg sable 0/4 (pour enduit tradition.)
+  const [typeEnd, setTypeEnd] = useState("Enduit traditionnel 3 couches (20 kg/m²)");
+  const [vEnd, setVEnd] = useState({});
+  const [ouvEnd, setOuvEnd] = useState([]);
+  const [resEnd, setResEnd] = useState(null);
+
+  const calc = () => {
+    const f = ENDUITS[typeEnd];
+    const surfB = parseFloat(vEnd.L||0) * parseFloat(vEnd.H||0);
+    const surfO = ouvEnd.reduce((s,o) => s + parseFloat(o.L||0)*parseFloat(o.H||0), 0);
+    const surfN = Math.max(0, surfB - surfO);
+    const surfCmd = surfN * 1.10;
+    const kgEnd = surfCmd * f.conso;
+    const nbSacs = Math.ceil(kgEnd / f.sac);
+    // Sable (uniquement enduit trad.)
+    const kgSable = typeEnd.includes("traditionnel") ? surfCmd * 30 : 0;
+    const tonneSable = kgSable > 0 ? `${(kgSable/1000).toFixed(2)} t` : "N/A (enduit prêt à l'emploi)";
+    setResEnd({
+      "Surface brute": `${surfB.toFixed(2)} m²`,
+      "Surface ouvertures": `${surfO.toFixed(2)} m²`,
+      "Surface nette +10%": `${surfCmd.toFixed(2)} m²`,
+      [`Enduit (sacs ${f.sac} kg)`]: `${nbSacs} sacs (${kgEnd.toFixed(0)} kg)`,
+      "Sable 0/4 nécessaire": tonneSable,
+    });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <CalcCard title="Enduit / Crépi — Quantité & Sable">
+        <Select label="Type d'enduit" value={typeEnd} onChange={v => { setTypeEnd(v); setResEnd(null); }} options={Object.keys(ENDUITS)} />
+        <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
+          Consommation : <strong style={{ color:"#1a1a1a" }}>{ENDUITS[typeEnd].conso} kg/m²</strong> · Sacs de {ENDUITS[typeEnd].sac} kg
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Input label="Longueur façade (m)" value={vEnd.L||""} onChange={v => setVEnd(p=>({...p,L:v}))} type="number" placeholder="15" />
+          <Input label="Hauteur façade (m)"  value={vEnd.H||""} onChange={v => setVEnd(p=>({...p,H:v}))} type="number" placeholder="6" />
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <label style={{ fontSize:11, color:C.muted, fontWeight:600, letterSpacing:".07em", textTransform:"uppercase" }}>Déduire les ouvertures</label>
+            <button onClick={() => setOuvEnd(p=>[...p,{id:Date.now(),label:"Ouverture",L:"",H:""}])} style={{ background:"#fff", border:`1.5px solid ${C.border}`, color:"#1a1a1a", borderRadius:8, padding:"3px 12px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>+ Ajouter</button>
+          </div>
+          {ouvEnd.map(o => (
+            <div key={o.id} style={{ display:"flex", gap:6, alignItems:"center" }}>
+              <input value={o.label} onChange={e => setOuvEnd(p=>p.map(x=>x.id===o.id?{...x,label:e.target.value}:x))} style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:12, width:100, fontFamily:"inherit", outline:"none" }} />
+              <input type="number" value={o.L} onChange={e => setOuvEnd(p=>p.map(x=>x.id===o.id?{...x,L:e.target.value}:x))} placeholder="L (m)" style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:12, width:65, fontFamily:"inherit", outline:"none" }} />
+              <input type="number" value={o.H} onChange={e => setOuvEnd(p=>p.map(x=>x.id===o.id?{...x,H:e.target.value}:x))} placeholder="H (m)" style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:12, width:65, fontFamily:"inherit", outline:"none" }} />
+              <button onClick={() => setOuvEnd(p=>p.filter(x=>x.id!==o.id))} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:18 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={calc} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
+        <ResultBox result={resEnd} />
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ +10% pertes et reprises inclus. Sable uniquement pour enduit traditionnel.</div>
+      </CalcCard>
+    </div>
+  );
+}
+
+// ── TAB CALCULS ────────────────────────────────────────────────────────────
+function TabCalculs() {
+  const [corps, setCorps] = useState("go");
+  return (
+    <div style={{ display: "flex", gap: 20, height: "100%" }}>
+
+      {/* sidebar corps d'état */}
+      <div style={{ width: 200, flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+        {CORPS.map(c => (
+          <button key={c.id} onClick={() => setCorps(c.id)} style={{
+            background: corps === c.id ? "#1a1a1a" : "#fff",
+            color: corps === c.id ? "#fff" : C.muted,
+            border: `1.5px solid ${corps === c.id ? "#1a1a1a" : C.border}`,
+            borderRadius: 10, padding: "10px 14px", fontWeight: corps === c.id ? 600 : 400,
+            fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+            fontFamily: "inherit", textAlign: "left", transition: "all .15s",
+            boxShadow: corps === c.id ? "0 1px 4px rgba(0,0,0,.15)" : "0 1px 2px rgba(0,0,0,.04)",
+          }}>
+            <span style={{ fontSize: 18 }}>{c.icon}</span>
+            <span style={{ lineHeight: 1.3 }}>{c.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* contenu */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {corps === "go"        && <CalcGO />}
+        {corps === "charpente" && <CalcCharpente />}
+        {corps === "carrelage" && <CalcCarrelage />}
+        {corps === "enduit"    && <CalcEnduit />}
+      </div>
+    </div>
+  );
+}
+
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// TAB 4 — DOCUMENTS (import PDF par chantier)
+// ══════════════════════════════════════════════════════════════════════════
+const DOC_TYPES = ["Plan", "CCTP", "Notice", "Devis", "Rapport", "Autre"];
+
+function TabDocuments() {
+  const [chantiers] = useLocalStorage("cdx_chantiers", INIT_CHANTIERS);
+  const [docs, setDocs] = useLocalStorage("cdx_docs_meta", []); // métadonnées sans base64
+  const [filterChantier, setFilterChantier] = useState("Tous");
+  const [filterType, setFilterType] = useState("Tous");
+  const [viewing, setViewing] = useState(null); // { nom, dataUrl }
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ nom: "", chantier: "", type: "Plan" });
+  const [pdfData, setPdfData] = useState(null); // base64 en mémoire seulement
+
+  // Les PDF sont stockés en mémoire de session (trop lourds pour localStorage)
+  const [pdfStore, setPdfStore] = useState({}); // id -> dataUrl
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file || file.type !== "application/pdf") return;
+    const reader = new FileReader();
+    reader.onload = ev => setPdfData({ dataUrl: ev.target.result, nom: file.name });
+    reader.readAsDataURL(file);
+    setDraft(d => ({ ...d, nom: file.name.replace(".pdf", "") }));
+  };
+
+  const saveDoc = () => {
+    if (!pdfData || !draft.chantier) return;
+    const id = Date.now();
+    const meta = { id, nom: draft.nom || pdfData.nom, chantier: draft.chantier, type: draft.type, date: new Date().toLocaleDateString("fr-FR") };
+    setDocs(prev => [meta, ...prev]);
+    setPdfStore(prev => ({ ...prev, [id]: pdfData.dataUrl }));
+    setPdfData(null);
+    setDraft({ nom: "", chantier: "", type: "Plan" });
+    setAdding(false);
+  };
+
+  const delDoc = (id) => {
+    setDocs(prev => prev.filter(d => d.id !== id));
+    setPdfStore(prev => { const n = { ...prev }; delete n[id]; return n; });
+    if (viewing && viewing.id === id) setViewing(null);
+  };
+
+  const openDoc = (doc) => {
+    const dataUrl = pdfStore[doc.id];
+    if (!dataUrl) { alert("Ce document n'est plus disponible en mémoire. Veuillez le ré-importer (les PDFs sont conservés uniquement pendant la session en cours)."); return; }
+    setViewing({ ...doc, dataUrl });
+  };
+
+  const filtered = docs.filter(d =>
+    (filterChantier === "Tous" || d.chantier === filterChantier) &&
+    (filterType === "Tous" || d.type === filterType)
+  );
+
+  const chantiersNoms = ["Tous", ...chantiers.map(c => c.nom)];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: viewing ? "320px 1fr" : "1fr", gap: 16, height: "calc(100vh - 130px)" }}>
+
+      {/* panneau gauche : liste */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+        {/* barre d'outils */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={filterChantier} onChange={e => setFilterChantier(e.target.value)}
+            style={{ background: "#fff", border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "6px 10px", fontSize: 12, flex: 1, fontFamily: "inherit", outline: "none" }}>
+            {chantiersNoms.map(n => <option key={n}>{n}</option>)}
+          </select>
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}
+            style={{ background: "#fff", border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "6px 10px", fontSize: 12, fontFamily: "inherit", outline: "none" }}>
+            {["Tous", ...DOC_TYPES].map(t => <option key={t}>{t}</option>)}
+          </select>
+          <Btn small onClick={() => { setAdding(true); setViewing(null); }}>+ Importer</Btn>
+        </div>
+
+        {/* formulaire d'import */}
+        {adding && (
+          <div style={{ background: "#fff", border: `1.5px solid #1a1a1a`, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 2px 12px rgba(0,0,0,.08)" }}>
+            <h3 style={{ margin: 0, color: "#1a1a1a", fontSize: 11, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase" }}>Importer un PDF</h3>
+
+            {/* zone de dépôt */}
+            <label style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              border: `2px dashed ${pdfData ? C.green : C.border}`, borderRadius: 10, padding: "20px 16px",
+              cursor: "pointer", color: pdfData ? C.green : C.muted, fontSize: 13, gap: 6, background: "#f5f4f0",
+            }}>
+              <span style={{ fontSize: 28 }}>{pdfData ? "✅" : "📄"}</span>
+              {pdfData ? pdfData.nom : "Cliquer pour choisir un PDF"}
+              <input type="file" accept="application/pdf" onChange={handleFile} style={{ display: "none" }} />
+            </label>
+
+            <Input label="Nom du document" value={draft.nom} onChange={v => setDraft(d => ({ ...d, nom: v }))} placeholder="Ex : Plan RDC R01" />
+            <Select label="Chantier" value={draft.chantier} onChange={v => setDraft(d => ({ ...d, chantier: v }))}
+              options={["", ...chantiers.map(c => c.nom)]} />
+            <Select label="Type" value={draft.type} onChange={v => setDraft(d => ({ ...d, type: v }))} options={DOC_TYPES} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn onClick={saveDoc}>Enregistrer</Btn>
+              <Btn variant="ghost" onClick={() => { setAdding(false); setPdfData(null); }}>Annuler</Btn>
+            </div>
+            <div style={{ color: C.muted, fontSize: 11, lineHeight: 1.5 }}>
+              ⚠️ Les PDFs sont visibles pendant la session. Ré-importez-les à chaque ouverture du fichier.
+            </div>
+          </div>
+        )}
+
+        {/* liste des docs */}
+        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+          {filtered.length === 0 && (
+            <div style={{ color: C.muted, textAlign: "center", marginTop: 40, fontSize: 14 }}>
+              Aucun document{filterChantier !== "Tous" ? ` pour ${filterChantier}` : ""}<br />
+              <span style={{ fontSize: 12 }}>Clique sur « + Importer » pour ajouter un PDF</span>
+            </div>
+          )}
+          {filtered.map(doc => (
+            <div key={doc.id} onClick={() => openDoc(doc)}
+              style={{
+                background: "#fff",
+                border: `1.5px solid ${viewing && viewing.id === doc.id ? "#1a1a1a" : C.border}`,
+                borderRadius: 12, padding: "12px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                boxShadow: viewing && viewing.id === doc.id ? "0 2px 8px rgba(0,0,0,.08)" : "0 1px 3px rgba(0,0,0,.04)",
+              }}>
+              <div style={{ fontSize: 26, flexShrink: 0 }}>📄</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{doc.nom}</div>
+                <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>{doc.chantier} · {doc.date}</div>
+                <span style={{
+                  background: "#f0ede7", color: "#555", borderRadius: 4,
+                  padding: "1px 7px", fontSize: 10, fontWeight: 600, marginTop: 4, display: "inline-block", letterSpacing: ".03em"
+                }}>{doc.type}</span>
+              </div>
+              <button onClick={e => { e.stopPropagation(); delDoc(doc.id); }}
+                style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 18, flexShrink: 0 }}>×</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* panneau droit : visionneuse */}
+      {viewing && (
+        <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", minHeight: 0, boxShadow: "0 2px 12px rgba(0,0,0,.07)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 18px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+            <div>
+              <span style={{ fontWeight: 600, fontSize: 14, color: "#1a1a1a" }}>{viewing.nom}</span>
+              <span style={{ color: C.muted, fontSize: 12, marginLeft: 10 }}>{viewing.chantier}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <a href={viewing.dataUrl} download={viewing.nom + ".pdf"}
+                style={{ background: "#f5f4f0", color: "#1a1a1a", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer", textDecoration: "none" }}>
+                ⬇️ Télécharger
+              </a>
+              <button onClick={() => setViewing(null)}
+                style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+          </div>
+          <iframe src={viewing.dataUrl} style={{ flex: 1, border: "none", borderRadius: "0 0 14px 14px", minHeight: 0 }} title={viewing.nom} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════
+function App() {
+  const [tab, setTab] = useState("chantiers");
+  return (
+    <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Outfit', sans-serif", display: "flex", flexDirection: "column" }}>
+      {/* header */}
+      <div style={{ background: "#fff", borderBottom: `1px solid ${C.border}`, padding: "0 32px", display: "flex", alignItems: "stretch", justifyContent: "space-between", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0" }}>
+          <div style={{ background: "#1a1a1a", color: "#fff", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: 17, letterSpacing: "-.01em" }}>K</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", letterSpacing: "-.01em", fontFamily: "'Playfair Display', serif" }}>CdT Assistant</div>
+            <div style={{ color: C.muted, fontSize: 11, fontWeight: 400, letterSpacing: ".02em" }}>Kelian · Conducteur de travaux · Nîmes</div>
+          </div>
+        </div>
+        {/* tabs intégrés dans le header */}
+        <div style={{ display: "flex", alignItems: "stretch", gap: 0 }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              background: "none", border: "none",
+              borderBottom: tab === t.id ? "2px solid #1a1a1a" : "2px solid transparent",
+              color: tab === t.id ? "#1a1a1a" : C.muted,
+              padding: "0 20px", fontWeight: tab === t.id ? 600 : 400, fontSize: 13,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 7,
+              fontFamily: "inherit", letterSpacing: ".01em", transition: "color .15s",
+            }}
+              onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.color = "#555"; }}
+              onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.color = C.muted; }}
+            ><span style={{ fontSize: 15 }}>{t.icon}</span>{t.label}</button>
+          ))}
+        </div>
+        <div style={{ color: C.muted, fontSize: 12, display: "flex", alignItems: "center", letterSpacing: ".02em" }}>
+          {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+        </div>
+      </div>
+      {/* content */}
+      <div style={{ flex: 1, padding: "24px 32px", overflow: "auto", maxWidth: 1400, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+        {tab === "chantiers" && <TabChantiers />}
+        {tab === "cr" && <TabCR />}
+        {tab === "calculs" && <TabCalculs />}
+        {tab === "documents" && <TabDocuments />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
