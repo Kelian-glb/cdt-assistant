@@ -14,6 +14,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -3252,24 +3253,21 @@ function App() {
 
       {/* ── header Apple-style ── */}
       <div style={{
-        background: "rgba(255,255,255,.85)", backdropFilter: "saturate(180%) blur(20px)",
-        WebkitBackdropFilter: "saturate(180%) blur(20px)",
-        borderBottom: `1px solid ${C.border}`,
+        background: "#ece8e3",
+        borderBottom: "1px solid #d6d0c8",
         padding: mob ? "0 16px" : "0 28px",
         display: "flex", alignItems: "stretch", justifyContent: "space-between",
         position: "sticky", top: 0, zIndex: 50,
       }}>
         {/* logo Bâtir */}
-        <div style={{ display: "flex", alignItems: "center", padding: "8px 0", cursor: "pointer", gap: 8 }} onClick={() => setTab("dashboard")}>
-          <svg width="26" height="26" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="36,6 4,34 68,34" fill="#1a1a1a"/>
-            <rect x="48" y="14" width="7" height="20" rx="1" fill="#1a1a1a"/>
-            <rect x="8" y="34" width="56" height="30" rx="2" fill="#1a1a1a"/>
-            <rect x="28" y="46" width="16" height="18" rx="3" fill="#f5f4f0"/>
-            <rect x="13" y="40" width="12" height="12" rx="2" fill="#f5f4f0"/>
-            <rect x="47" y="40" width="12" height="12" rx="2" fill="#f5f4f0"/>
-          </svg>
-          <span style={{ fontWeight: 700, fontSize: 16, color: "#1a1a1a", letterSpacing: "-.02em", fontFamily: "inherit" }}>Bâtir</span>
+        <div style={{ display: "flex", alignItems: "center", padding: "8px 0", cursor: "pointer" }} onClick={() => setTab("dashboard")}>
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 700, fontSize: 18, letterSpacing: "0.28em", color: "#1a1a1a", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 0 }}>
+            B
+            <svg width="11" height="11" viewBox="0 0 11 11" style={{ margin: "0 1px", flexShrink: 0 }}>
+              <polygon points="5.5,1 10.5,10 0.5,10" fill="#b5a48a"/>
+            </svg>
+            TIR
+          </span>
         </div>
         {/* tabs desktop */}
         {!mob && (
