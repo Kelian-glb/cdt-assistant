@@ -3261,12 +3261,17 @@ function App() {
       }}>
         {/* logo Bâtir */}
         <div style={{ display: "flex", alignItems: "center", padding: "8px 0", cursor: "pointer" }} onClick={() => setTab("dashboard")}>
-          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 700, fontSize: 18, letterSpacing: "0.28em", color: "#1a1a1a", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 0 }}>
-            B
-            <svg width="11" height="11" viewBox="0 0 11 11" style={{ margin: "0 1px", flexShrink: 0 }}>
-              <polygon points="5.5,1 10.5,10 0.5,10" fill="#b5a48a"/>
-            </svg>
-            TIR
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 700, fontSize: 18, color: "#1a1a1a", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: "0.18em", letterSpacing: 0 }}>
+            <span>B</span>
+            <span style={{ position: "relative", display: "inline-block" }}>
+              A
+              <svg style={{ position: "absolute", bottom: "22%", left: "50%", transform: "translateX(-50%)" }} width="7" height="6" viewBox="0 0 7 6">
+                <polygon points="3.5,0 7,6 0,6" fill="#b5a48a"/>
+              </svg>
+            </span>
+            <span>T</span>
+            <span>I</span>
+            <span>R</span>
           </span>
         </div>
         {/* tabs desktop */}
