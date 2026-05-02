@@ -278,7 +278,7 @@ function useSupaChantiers(userId) {
 }
 
 function useSupaSettings(userId) {
-  const [settings, setSettings] = useState(null);
+  const [settings, setSettings] = useState({ phases: null, modeles_checklist: {} });
 
   useEffect(() => {
     if (!userId) return;
@@ -375,31 +375,6 @@ function useSupaMetres(userId) {
 
   return { items: items || [], save };
 }
-
-// ── Hook Entreprise ─────────────────────────────────────────────────────────
-function useSupaEntreprise(userId) {
-  const [entreprise, setEntreprise] = useState(null);
-
-  useEffect(() => {
-    if (!userId) return;
-    supabase.from("entreprise").select("*").eq("user_id", userId).maybeSingle()
-      .then(({ data }) => setEntreprise(data || {}));
-  }, [userId]);
-
-  const save = async (data) => {
-    setEntreprise(data);
-    const { data: existing } = await supabase.from("entreprise").select("id").eq("user_id", userId).maybeSingle();
-    const payload = { ...data, user_id: userId, updated_at: new Date().toISOString() };
-    if (existing) {
-      await supabase.from("entreprise").update(payload).eq("user_id", userId);
-    } else {
-      await supabase.from("entreprise").insert(payload);
-    }
-  };
-
-  return { entreprise, save };
-}
-
 
 // ── Helpers PDF ────────────────────────────────────────────────────────────
 function buildEnteteHTML(entreprise) {
@@ -1090,7 +1065,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
   const mob = useIsMobile();
   const { chantiers } = supaChantiers;
   const { settings } = supaSettings;
-  const phases = settings?.phases?.length > 0 ? settings.phases : PHASES_DEFAULT;
+  const phases  = settings?.phases?.length > 0 ? settings.phases : PHASES_DEFAULT;
   const modeles = settings?.modeles_checklist || {};
   const today = new Date().toISOString().split("T")[0];
 
@@ -1327,7 +1302,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
     await saveSettings({ phases: newPhases, modeles_checklist: modeles });
   };
 
-  if (chantiers === null) return (
+  if (!chantiers) return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:200, color:C.muted, fontSize:14 }}>
       Chargement de vos chantiers...
     </div>
@@ -2100,178 +2075,6 @@ Signature Artisan    : ___________________    Date : ${d}`);
   );
 }
 
-
-  const generate = () => {
-    const d = new Date(cr.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
-    const txt = `COMPTE-RENDU DE RÉUNION DE CHANTIER
-════════════════════════════════════════
-
-Chantier     : ${cr.chantier}
-Date         : ${d}
-Conducteur   : ${cr.conducteurTravaux}
-Maîtrise d'ouvrage : ${cr.maitriseOuvrage}
-
-PRÉSENTS
-————————————————————————————————————————
-Entreprises  : ${cr.presentsEntreprises}
-Client       : ${cr.presentsClient}
-
-1. AVANCEMENT DES TRAVAUX
-————————————————————————————————————————
-${cr.avancement}
-
-2. POINTS VALIDÉS
-————————————————————————————————————————
-${cr.pointsAvalides}
-
-3. PROBLÈMES / POINTS DE VIGILANCE
-————————————————————————————————————————
-${cr.problemes}
-
-4. DÉCISIONS RETENUES
-————————————————————————————————————————
-${cr.decisionsRetenues}
-
-5. RÉSERVES
-————————————————————————————————————————
-Levées    : ${cr.reservesLevees || "Aucune"}
-Nouvelles : ${cr.reservesNouvelles || "Aucune"}
-
-6. PROCHAIN RDV DE CHANTIER
-————————————————————————————————————————
-${cr.prochainRdv}
-
-────────────────────────────────────────
-Document établi par ${cr.conducteurTravaux} – ${d}`;
-    setOutput(txt);
-    setSaved(false);
-  };
-
-  const saveToSupabase = async () => {
-    if (!output || saving) return;
-    setSaving(true);
-    await saveCR({
-      chantier: cr.chantier, date: cr.date, conducteur: cr.conducteurTravaux,
-      maitrise_ouvrage: cr.maitriseOuvrage, presents_entreprises: cr.presentsEntreprises,
-      presents_client: cr.presentsClient, avancement: cr.avancement,
-      points_avalides: cr.pointsAvalides, problemes: cr.problemes,
-      decisions: cr.decisionsRetenues, reserves_levees: cr.reservesLevees,
-      reserves_nouvelles: cr.reservesNouvelles, prochain_rdv: cr.prochainRdv,
-      contenu: output,
-    });
-    setSaving(false); setSaved(true);
-  };
-
-  const copy = () => { navigator.clipboard.writeText(output).catch(() => {}); };
-  const F = (k, label, placeholder, comp = "input", rows) => comp === "textarea"
-    ? <Textarea key={k} label={label} value={cr[k]} onChange={v => setCr(c => ({ ...c, [k]: v }))} rows={rows || 3} placeholder={placeholder} />
-    : <Input key={k} label={label} value={cr[k]} onChange={v => setCr(c => ({ ...c, [k]: v }))} placeholder={placeholder} />;
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:16, height:"100%" }}>
-      <div style={{ display:"flex", background:C.surface2, borderRadius:10, padding:3, width:"fit-content" }}>
-        {[["form","✏️ Nouveau CR"],["historique",`📚 Historique (${(crs||[]).length})`]].map(([v,l]) => (
-          <button key={v} onClick={() => setView(v)} style={{
-            background: view===v ? C.surface : "transparent", border:"none", borderRadius:8,
-            padding:"7px 16px", fontSize:13, fontWeight: view===v ? 600 : 400,
-            color: view===v ? C.text : C.muted, cursor:"pointer", fontFamily:"inherit",
-            boxShadow: view===v ? "0 1px 3px rgba(0,0,0,.1)" : "none",
-          }}>{l}</button>
-        ))}
-      </div>
-
-      {view === "form" ? (
-        <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:20, flex:1 }}>
-          <div style={{ overflowY:"auto", display:"flex", flexDirection:"column", gap:12, background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>Informations générales</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Chantier</label>
-              <select value={cr.chantier} onChange={e => setCr(c=>({...c,chantier:e.target.value}))}
-                style={{ background:C.surface, color:C.text, padding:"10px 13px", fontSize:15, outline:"none", fontFamily:"inherit", border:`1.5px solid ${C.border}`, borderRadius:10, appearance:"none", backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236d6d72' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat:"no-repeat", backgroundPosition:"right 13px center", paddingRight:36 }}>
-                <option value="">— Sélectionner un chantier —</option>
-                {(chantiers||[]).map(c => <option key={c.id} value={c.client||c.nom}>{c.client||c.nom}</option>)}
-              </select>
-            </div>
-            <Input label="Date" value={cr.date} onChange={v => setCr(c => ({ ...c, date: v }))} type="date" />
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <Input label="Conducteur" value={cr.conducteurTravaux} onChange={v => setCr(c => ({ ...c, conducteurTravaux: v }))} />
-              <Input label="Maîtrise d'ouvrage" value={cr.maitriseOuvrage} onChange={v => setCr(c => ({ ...c, maitriseOuvrage: v }))} placeholder="MO" />
-            </div>
-            <Textarea label="Entreprises présentes" value={cr.presentsEntreprises} onChange={v => setCr(c => ({ ...c, presentsEntreprises: v }))} rows={2} placeholder="Maçon, charpentier..." />
-            <Textarea label="Client présent" value={cr.presentsClient} onChange={v => setCr(c => ({ ...c, presentsClient: v }))} rows={1} placeholder="M. Dupont" />
-            <div style={{ height:1, background:C.border }} />
-            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>Contenu</div>
-            {F("avancement", "Avancement des travaux", "État d'avancement...", "textarea", 3)}
-            {F("pointsAvalides", "Points validés", "CE, plans, choix matériaux...", "textarea", 3)}
-            {F("problemes", "Problèmes / points de vigilance", "Intempéries, retards...", "textarea", 3)}
-            {F("decisionsRetenues", "Décisions retenues", "Modifications, arbitrages...", "textarea", 3)}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <Textarea label="Réserves levées" value={cr.reservesLevees} onChange={v => setCr(c => ({ ...c, reservesLevees: v }))} rows={2} />
-              <Textarea label="Réserves nouvelles" value={cr.reservesNouvelles} onChange={v => setCr(c => ({ ...c, reservesNouvelles: v }))} rows={2} />
-            </div>
-            {F("prochainRdv", "Prochain RDV", "Jeudi 15 mai à 9h00")}
-            <Btn onClick={generate}>📄 Générer le CR</Btn>
-          </div>
-          <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
-              <span style={{ fontWeight:600, fontSize:13 }}>Prévisualisation</span>
-              {output && (
-                <div style={{ display:"flex", gap:6 }}>
-                  <Btn small variant="ghost" onClick={copy}>📋 Copier</Btn>
-                  <Btn small onClick={saveToSupabase} disabled={saving||saved}>
-                    {saved ? "✅ Sauvegardé" : saving ? "..." : "💾 Sauvegarder"}
-                  </Btn>
-                </div>
-              )}
-            </div>
-            <pre style={{ flex:1, overflowY:"auto", margin:0, padding:18, color: output?C.text:C.muted, fontSize:12, lineHeight:1.8, fontFamily:"Courier New,monospace", whiteSpace:"pre-wrap", background:C.surface2, borderRadius:"0 0 16px 16px" }}>
-              {output || "Remplis le formulaire et clique sur Générer le CR pour voir le résultat."}
-            </pre>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":(viewingCR?"1fr 1fr":"1fr"), gap:16, flex:1 }}>
-          <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, fontSize:13, fontWeight:600 }}>
-              {(crs||[]).length} CR sauvegardé{(crs||[]).length>1?"s":""}
-            </div>
-            <div style={{ overflowY:"auto", flex:1 }}>
-              {(crs||[]).length === 0 && (
-                <div style={{ color:C.muted, textAlign:"center", padding:"40px 20px", fontSize:14 }}>Aucun CR sauvegardé</div>
-              )}
-              {(crs||[]).map(c => (
-                <div key={c.id} onClick={() => setViewingCR(viewingCR?.id===c.id?null:c)}
-                  style={{ padding:"14px 18px", cursor:"pointer", borderBottom:`1px solid ${C.border}`, background: viewingCR?.id===c.id ? C.blueL : "transparent" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div style={{ fontWeight:600, fontSize:14 }}>{c.chantier || "Sans titre"}</div>
-                    <button onClick={e => { e.stopPropagation(); delCR(c.id); }} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:16, opacity:.6 }}>×</button>
-                  </div>
-                  <div style={{ color:C.muted, fontSize:12, marginTop:3 }}>
-                    {c.conducteur} · {c.date ? new Date(c.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}) : ""}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {viewingCR && (
-            <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
-                <span style={{ fontWeight:600, fontSize:13 }}>{viewingCR.chantier}</span>
-                <div style={{ display:"flex", gap:6 }}>
-                  <Btn small variant="ghost" onClick={() => navigator.clipboard.writeText(viewingCR.contenu||"")}>📋 Copier</Btn>
-                  <button onClick={() => setViewingCR(null)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:20 }}>×</button>
-                </div>
-              </div>
-              <pre style={{ flex:1, overflowY:"auto", margin:0, padding:18, color:C.text, fontSize:12, lineHeight:1.8, fontFamily:"Courier New,monospace", whiteSpace:"pre-wrap", background:C.surface2, borderRadius:"0 0 16px 16px" }}>
-                {viewingCR.contenu || "Contenu non disponible"}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // TAB 3 — CALCULS PAR CORPS D'ÉTAT
 // ══════════════════════════════════════════════════════════════════════════
@@ -3544,3 +3347,7 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+</body>
+</html>
