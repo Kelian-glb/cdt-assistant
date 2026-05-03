@@ -486,7 +486,10 @@ ${rappelsDone.length>0?`<h2>Rappels réglés</h2>${rappelsDone.map(r=>`<div clas
   `, `Fiche – ${nom}`);
 }
 
-function exportCRPDF(cr, entreprise) {
+function exportCRPDF(cr, entreprise, sigConducteur, sigMO) {
+  const sigBox = (sig) => sig
+    ? `<img src="${sig}" style="display:block;height:80px;width:100%;object-fit:contain;border:1.5px solid #e5e5ea;border-radius:8px;margin-top:6px;" />`
+    : `<div class="sig-box">Signature</div>`;
   openPDF(`
 ${buildEnteteHTML(entreprise)}
 <h1 style="font-size:18px">Compte-rendu de réunion de chantier</h1>
@@ -508,11 +511,19 @@ ${cr.decisionsRetenues?`<h2>Décisions retenues</h2><div style="background:#f2f2
   <div class="meta-item"><div class="meta-label">Nouvelles</div><div class="meta-value">${cr.reservesNouvelles||"Aucune"}</div></div>
 </div>
 ${cr.prochainRdv?`<h2>Prochain RDV</h2><div style="background:#f2f2f7;border-radius:8px;padding:10px 12px;font-weight:600">${cr.prochainRdv}</div>`:""}
+<h2>Signatures</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px">
+  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Conducteur de travaux</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${cr.conducteurTravaux||""}</div>${sigBox(sigConducteur)}</div>
+  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Maîtrise d'ouvrage</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${cr.maitriseOuvrage||""}</div>${sigBox(sigMO)}</div>
+</div>
 <div class="footer"><span>${entreprise?.nom||"Bâtir"} — CR établi par ${cr.conducteurTravaux||""}</span><span>${cr.chantier||""} · ${new Date().toLocaleDateString("fr-FR")}</span></div>
   `, `CR – ${cr.chantier||"Réunion"}`);
 }
 
-function exportPVPDF(pv, entreprise) {
+function exportPVPDF(pv, entreprise, sigConducteur, sigArtisan) {
+  const sigBox = (sig) => sig
+    ? `<img src="${sig}" style="display:block;height:80px;width:100%;object-fit:contain;border:1.5px solid #e5e5ea;border-radius:8px;margin-top:6px;" />`
+    : `<div class="sig-box">Signature</div>`;
   openPDF(`
 ${buildEnteteHTML(entreprise)}
 <h1 style="font-size:18px">Procès-verbal de réception de travaux</h1>
@@ -535,8 +546,8 @@ ${pv.observations?`<h2>Observations</h2><div style="background:#f2f2f7;border-ra
   ${pv.decision==="Accepté sans réserve"?"✅":pv.decision==="Refusé"?"❌":"⚠️"} ${pv.decision||"—"}</div>
 <h2>Signatures</h2>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px">
-  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Conducteur de travaux</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${pv.conducteur||""}</div><div class="sig-box">Signature</div></div>
-  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Artisan / Entreprise</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${pv.artisan||""}</div><div class="sig-box">Signature</div></div>
+  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Conducteur de travaux</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${pv.conducteur||""}</div>${sigBox(sigConducteur)}</div>
+  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Artisan / Entreprise</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${pv.artisan||""}</div>${sigBox(sigArtisan)}</div>
 </div>
 <div class="footer"><span>${entreprise?.nom||"Bâtir"} — PV établi par ${pv.conducteur||""}</span><span>${pv.chantier||""} · ${new Date().toLocaleDateString("fr-FR")}</span></div>
   `, `PV – ${pv.artisan||pv.chantier||"Réception"}`);
@@ -1693,6 +1704,70 @@ function RappelsPanel({ chantier, onUpdate, phases }) {
 }
 
 
+function SignaturePad({ label, value, onChange }) {
+  const canvasRef = React.useRef(null);
+  const isDrawing = React.useRef(false);
+  const lastPt = React.useRef(null);
+
+  const getXY = (e, canvas) => {
+    const r = canvas.getBoundingClientRect();
+    const sx = canvas.width / r.width, sy = canvas.height / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * sx, y: (src.clientY - r.top) * sy };
+  };
+
+  const onStart = (e) => {
+    e.preventDefault();
+    isDrawing.current = true;
+    lastPt.current = getXY(e, canvasRef.current);
+  };
+
+  const onMove = (e) => {
+    e.preventDefault();
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pt = getXY(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(lastPt.current.x, lastPt.current.y);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.strokeStyle = "#1c1c1e";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    lastPt.current = pt;
+  };
+
+  const onEnd = () => {
+    if (!isDrawing.current) return;
+    isDrawing.current = false;
+    onChange(canvasRef.current.toDataURL("image/png"));
+  };
+
+  const clear = (e) => {
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    onChange(null);
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+      {label && <div style={{ fontSize:12, color:C.muted, fontWeight:500 }}>{label}</div>}
+      <div style={{ position:"relative", borderRadius:10, overflow:"hidden", background:"#fff", border:`1.5px solid ${value ? "#0071e3" : C.border}` }}>
+        <canvas ref={canvasRef} width={600} height={120}
+          style={{ display:"block", width:"100%", height:100, cursor:"crosshair", touchAction:"none" }}
+          onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+          onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+        />
+        {!value && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, color:"#aeaeb2", pointerEvents:"none" }}>Signez ici →</div>}
+      </div>
+      {value && <button onClick={clear} style={{ alignSelf:"flex-end", background:"none", border:"none", color:C.muted, fontSize:11, cursor:"pointer", padding:"2px 4px", fontFamily:"inherit" }}>✕ Effacer</button>}
+    </div>
+  );
+}
+
 function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
@@ -1712,6 +1787,12 @@ function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [viewingCR, setViewingCR] = useState(null);
+
+  // ── Signatures ──
+  const [sigCRConducteur, setSigCRConducteur] = useState(null);
+  const [sigCRMO, setSigCRMO] = useState(null);
+  const [sigPVConducteur, setSigPVConducteur] = useState(null);
+  const [sigPVArtisan, setSigPVArtisan] = useState(null);
 
   // ── PV state ──
   const [pv, setPv] = useState({
@@ -1892,6 +1973,10 @@ ${buildEnteteHTML(ent_)}
             </div>
             <Input label="Prochain RDV" value={cr.prochainRdv} onChange={v => setCr(c=>({...c,prochainRdv:v}))} placeholder="Jeudi 15 mai à 9h" />
             <Btn onClick={generate}>📄 Générer le CR</Btn>
+            <div style={{ height:1, background:C.border, margin:"4px 0" }} />
+            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>Signatures</div>
+            <SignaturePad label={`Conducteur de travaux${cr.conducteurTravaux ? ` — ${cr.conducteurTravaux}` : ""}`} value={sigCRConducteur} onChange={setSigCRConducteur} />
+            <SignaturePad label={`Maîtrise d'ouvrage${cr.maitriseOuvrage ? ` — ${cr.maitriseOuvrage}` : ""}`} value={sigCRMO} onChange={setSigCRMO} />
           </div>
           <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
@@ -1899,7 +1984,7 @@ ${buildEnteteHTML(ent_)}
               {output && (
                 <div style={{ display:"flex", gap:6 }}>
                   <Btn small variant="ghost" onClick={() => copy(output)}>📋 Copier</Btn>
-                  <Btn small variant="ghost" onClick={() => exportPDF(output, `CR — ${cr.chantier}`)}>🖨️ PDF</Btn>
+                  <Btn small variant="ghost" onClick={() => exportCRPDF(cr, entreprise, sigCRConducteur, sigCRMO)}>🖨️ PDF</Btn>
                   <Btn small onClick={saveToSupabase} disabled={saving||saved}>{saved?"✅ Sauvegardé":saving?"...":"💾 Sauvegarder"}</Btn>
                 </div>
               )}
@@ -1977,6 +2062,10 @@ ${buildEnteteHTML(ent_)}
             <Textarea label="Observations" value={pv.observations} onChange={v => setPv(p=>({...p,observations:v}))} rows={2} placeholder="Observations complémentaires..." />
             <Input label="Date de levée des réserves (si applicable)" value={pv.dateLeveReserves} onChange={v => setPv(p=>({...p,dateLeveReserves:v}))} type="date" />
             <Btn onClick={generatePV}>📄 Générer le PV</Btn>
+            <div style={{ height:1, background:C.border, margin:"4px 0" }} />
+            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>Signatures</div>
+            <SignaturePad label={`Conducteur de travaux${pv.conducteur ? ` — ${pv.conducteur}` : ""}`} value={sigPVConducteur} onChange={setSigPVConducteur} />
+            <SignaturePad label={`Artisan / Entreprise${pv.artisan ? ` — ${pv.artisan}` : ""}`} value={sigPVArtisan} onChange={setSigPVArtisan} />
           </div>
           <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
@@ -1984,7 +2073,7 @@ ${buildEnteteHTML(ent_)}
               {pvOutput && (
                 <div style={{ display:"flex", gap:6 }}>
                   <Btn small variant="ghost" onClick={() => copy(pvOutput)}>📋 Copier</Btn>
-                  <Btn small onClick={() => exportPDF(pvOutput, `PV — ${pv.artisan} — ${pv.chantier}`)}>🖨️ PDF</Btn>
+                  <Btn small onClick={() => exportPVPDF(pv, entreprise, sigPVConducteur, sigPVArtisan)}>🖨️ PDF</Btn>
                 </div>
               )}
             </div>
