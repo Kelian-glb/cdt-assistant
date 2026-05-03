@@ -1775,7 +1775,7 @@ function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
   const { chantiers } = supaChantiers;
   const { entreprise, save: saveEntreprise } = supaEntreprise;
 
-  const [view, setView] = useState("form"); // "form" | "historique" | "pv" | "entreprise"
+  const [view, setView] = useState("form"); // "form" | "pv" | "historique"
 
   // ── CR state ──
   const [cr, setCr] = useState({
@@ -1800,17 +1800,6 @@ function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
     travaux:"", reserves:"", observations:"", dateLeveReserves:"",
   });
   const [pvOutput, setPvOutput] = useState("");
-
-  // ── Entreprise state ──
-  const [ent, setEnt] = useState({ nom:"", adresse:"", telephone:"", email:"", logo_url:"" });
-  const [entSaving, setEntSaving] = useState(false);
-  const [entSaved, setEntSaved] = useState(false);
-
-  useEffect(() => {
-    if (entreprise && Object.keys(entreprise).length > 0) {
-      setEnt({ nom: entreprise.nom||"", adresse: entreprise.adresse||"", telephone: entreprise.telephone||"", email: entreprise.email||"", logo_url: entreprise.logo_url||"" });
-    }
-  }, [entreprise]);
 
   // ── Génération CR ──
   const generate = () => {
@@ -1939,7 +1928,6 @@ ${buildEnteteHTML(ent_)}
       <div style={{ display:"flex", background:C.surface2, borderRadius:10, padding:3, overflowX:"auto", width:"fit-content", maxWidth:"100%" }}>
         {tabBtn("form","✏️ Nouveau CR")}
         {tabBtn("pv","📝 PV Réception")}
-        {tabBtn("entreprise","🏢 Mon entreprise")}
         {tabBtn("historique",`📚 Historique (${(crs||[]).length})`)}
       </div>
 
@@ -2084,55 +2072,6 @@ ${buildEnteteHTML(ent_)}
         </div>
       )}
 
-      {/* ── MON ENTREPRISE ── */}
-      {view === "entreprise" && (
-        <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:20 }}>
-          <div style={{ background:C.surface, borderRadius:16, padding:22, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column", gap:14 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>Informations entreprise</div>
-            <div style={{ fontSize:12, color:C.muted, background:C.blueL, borderRadius:8, padding:"8px 12px" }}>
-              ℹ️ Ces informations apparaissent dans l'en-tête de tous vos documents PDF (CR, PV, fiches chantier).
-            </div>
-            <Input label="Nom de l'entreprise" value={ent.nom} onChange={v => { setEnt(e=>({...e,nom:v})); setEntSaved(false); }} placeholder="" />
-            <Input label="Adresse" value={ent.adresse} onChange={v => { setEnt(e=>({...e,adresse:v})); setEntSaved(false); }} placeholder="" />
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <Input label="Téléphone" value={ent.telephone} onChange={v => { setEnt(e=>({...e,telephone:v})); setEntSaved(false); }} placeholder="" />
-              <Input label="Email" value={ent.email} onChange={v => { setEnt(e=>({...e,email:v})); setEntSaved(false); }} placeholder="" />
-            </div>
-            <Input label="URL du logo (lien image)" value={ent.logo_url} onChange={v => { setEnt(e=>({...e,logo_url:v})); setEntSaved(false); }} placeholder="" />
-            <div style={{ fontSize:11, color:C.muted }}>
-              Pour le logo, hébergez votre image sur un service gratuit (ex: <strong>imgur.com</strong>) et collez l'URL directe ici.
-            </div>
-            <Btn onClick={async () => { setEntSaving(true); await saveEntreprise(ent); setEntSaving(false); setEntSaved(true); }} disabled={entSaving}>
-              {entSaved ? "✅ Sauvegardé" : entSaving ? "Sauvegarde..." : "💾 Enregistrer"}
-            </Btn>
-          </div>
-
-          {/* Aperçu en-tête */}
-          <div style={{ background:C.surface, borderRadius:16, padding:22, border:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.muted, marginBottom:14 }}>Aperçu de l'en-tête PDF</div>
-            <div style={{ background:"#fff", border:`1px solid ${C.border}`, borderRadius:12, padding:16 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"2px solid #0071e3", paddingBottom:12, marginBottom:12 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  {ent.logo_url ? (
-                    <img src={ent.logo_url} style={{ height:44, maxWidth:120, objectFit:"contain", borderRadius:6 }} alt="Logo" onError={e => e.target.style.display="none"} />
-                  ) : (
-                    <div style={{ background:"#0071e3", color:"#fff", borderRadius:8, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, fontWeight:700 }}>
-                      {(ent.nom||"K")[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <div style={{ fontSize:15, fontWeight:700, color:"#1c1c1e" }}>{ent.nom || "Nom de l'entreprise"}</div>
-                    {ent.adresse && <div style={{ fontSize:11, color:"#6d6d72" }}>{ent.adresse}</div>}
-                    <div style={{ fontSize:11, color:"#6d6d72" }}>{[ent.telephone, ent.email].filter(Boolean).join(" · ") || "Téléphone · Email"}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign:"right", fontSize:11, color:"#6d6d72" }}>{new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}</div>
-              </div>
-              <div style={{ fontSize:11, color:C.muted, textAlign:"center" }}>↑ En-tête qui apparaîtra sur tous vos PDFs</div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -3273,11 +3212,81 @@ function TabDocuments({ supaChantiers, pdfStore, setPdfStore }) {
   );
 }
 
+function EntrepriseModal({ isOpen, onClose, supaEntreprise }) {
+  const { entreprise, save: saveEntreprise } = supaEntreprise || {};
+  const [ent, setEnt] = useState({ nom:"", adresse:"", telephone:"", email:"", logo_url:"" });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (entreprise && Object.keys(entreprise).length > 0) {
+      setEnt({ nom: entreprise.nom||"", adresse: entreprise.adresse||"", telephone: entreprise.telephone||"", email: entreprise.email||"", logo_url: entreprise.logo_url||"" });
+    }
+  }, [entreprise, isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:C.surface, borderRadius:20, width:"100%", maxWidth:700, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,.25)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 24px", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ fontWeight:700, fontSize:16 }}>🏢 Mon entreprise</div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:C.muted, lineHeight:1 }}>×</button>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, padding:24 }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ fontSize:12, color:C.muted, background:C.blueL, borderRadius:8, padding:"8px 12px" }}>
+              ℹ️ Ces informations apparaissent dans l'en-tête de tous vos documents PDF (CR, PV, fiches chantier).
+            </div>
+            <Input label="Nom de l'entreprise" value={ent.nom} onChange={v => { setEnt(e=>({...e,nom:v})); setSaved(false); }} />
+            <Input label="Adresse" value={ent.adresse} onChange={v => { setEnt(e=>({...e,adresse:v})); setSaved(false); }} />
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+              <Input label="Téléphone" value={ent.telephone} onChange={v => { setEnt(e=>({...e,telephone:v})); setSaved(false); }} />
+              <Input label="Email" value={ent.email} onChange={v => { setEnt(e=>({...e,email:v})); setSaved(false); }} />
+            </div>
+            <Input label="URL du logo (lien image)" value={ent.logo_url} onChange={v => { setEnt(e=>({...e,logo_url:v})); setSaved(false); }} />
+            <div style={{ fontSize:11, color:C.muted }}>
+              Pour le logo, hébergez votre image sur un service gratuit (ex: <strong>imgur.com</strong>) et collez l'URL directe ici.
+            </div>
+            <Btn onClick={async () => { setSaving(true); await saveEntreprise(ent); setSaving(false); setSaved(true); }} disabled={saving}>
+              {saved ? "✅ Sauvegardé" : saving ? "Sauvegarde..." : "💾 Enregistrer"}
+            </Btn>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>Aperçu de l'en-tête PDF</div>
+            <div style={{ background:"#fff", border:`1px solid ${C.border}`, borderRadius:12, padding:16 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"2px solid #0071e3", paddingBottom:12, marginBottom:12 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  {ent.logo_url ? (
+                    <img src={ent.logo_url} style={{ height:44, maxWidth:120, objectFit:"contain", borderRadius:6 }} alt="Logo" onError={e => e.target.style.display="none"} />
+                  ) : (
+                    <div style={{ background:"#0071e3", color:"#fff", borderRadius:8, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, fontWeight:700 }}>
+                      {(ent.nom||"K")[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize:15, fontWeight:700, color:"#1c1c1e" }}>{ent.nom || "Nom de l'entreprise"}</div>
+                    {ent.adresse && <div style={{ fontSize:11, color:"#6d6d72" }}>{ent.adresse}</div>}
+                    <div style={{ fontSize:11, color:"#6d6d72" }}>{[ent.telephone, ent.email].filter(Boolean).join(" · ") || "Téléphone · Email"}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:"right", fontSize:11, color:"#6d6d72" }}>{new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}</div>
+              </div>
+              <div style={{ fontSize:11, color:C.muted, textAlign:"center" }}>↑ En-tête qui apparaîtra sur tous vos PDFs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 function App() {
   const [tab, setTab] = useState("dashboard");
   const [user, setUser] = useState(undefined); // undefined = loading, null = non connecté
   const [menuOpen, setMenuOpen] = useState(false);
+  const [entModalOpen, setEntModalOpen] = useState(false);
   const mob = useIsMobile();
 
   const supaChantiers  = useSupaChantiers(user?.id);
@@ -3321,6 +3330,8 @@ function App() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Outfit', sans-serif", display: "flex", flexDirection: "column" }}>
+
+      <EntrepriseModal isOpen={entModalOpen} onClose={() => setEntModalOpen(false)} supaEntreprise={supaEntreprise} />
 
       {/* ── header Apple-style ── */}
       <div style={{
@@ -3368,7 +3379,7 @@ function App() {
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{userLabel}</div>
                   </div>
                   <div style={{ padding: "6px 0" }}>
-                    <button style={{ width: "100%", textAlign: "left", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: C.text, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+                    <button onClick={() => { setEntModalOpen(true); setMenuOpen(false); }} style={{ width: "100%", textAlign: "left", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: C.text, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
                       <span>🏢</span> Mon entreprise
                     </button>
                     <button style={{ width: "100%", textAlign: "left", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: C.text, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
@@ -3404,7 +3415,7 @@ function App() {
                     <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{userLabel}</div>
                   </div>
                   <div style={{ padding: "6px 0" }}>
-                    <button style={{ width: "100%", textAlign: "left", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: C.text, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
+                    <button onClick={() => { setEntModalOpen(true); setMenuOpen(false); }} style={{ width: "100%", textAlign: "left", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: C.text, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
                       <span>🏢</span> Mon entreprise
                     </button>
                     <button style={{ width: "100%", textAlign: "left", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: C.text, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10 }}>
