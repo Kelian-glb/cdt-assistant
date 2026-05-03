@@ -3030,9 +3030,9 @@ function TabCalculs({ supaMetres }) {
 // ══════════════════════════════════════════════════════════════════════════
 const DOC_TYPES = ["Plan", "CCTP", "Notice", "Devis", "Rapport", "Autre"];
 
-function TabDocuments() {
+function TabDocuments({ supaChantiers, pdfStore, setPdfStore }) {
   const mob = useIsMobile();
-  const [chantiers] = useLocalStorage("cdx_chantiers", INIT_CHANTIERS);
+  const chantiers = supaChantiers?.chantiers || [];
   const [docs, setDocs] = useLocalStorage("cdx_docs_meta", []); // métadonnées sans base64
   const [filterChantier, setFilterChantier] = useState("Tous");
   const [filterType, setFilterType] = useState("Tous");
@@ -3040,9 +3040,6 @@ function TabDocuments() {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({ nom: "", chantier: "", type: "Plan" });
   const [pdfData, setPdfData] = useState(null); // base64 en mémoire seulement
-
-  // Les PDF sont stockés en mémoire de session (trop lourds pour localStorage)
-  const [pdfStore, setPdfStore] = useState({}); // id -> dataUrl
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -3200,6 +3197,7 @@ function App() {
   const supaCR         = useSupaCR(user?.id);
   const supaMetres     = useSupaMetres(user?.id);
   const supaEntreprise = useSupaEntreprise(user?.id);
+  const [pdfStore, setPdfStore] = useState({});
 
   // Vérifier la session au démarrage
   useEffect(() => {
@@ -3345,7 +3343,7 @@ function App() {
         {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} />}
         {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
         {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
-        {tab === "documents"  && <TabDocuments />}
+        {tab === "documents"  && <TabDocuments supaChantiers={supaChantiers} pdfStore={pdfStore} setPdfStore={setPdfStore} />}
       </div>
 
       {/* ── barre navigation mobile Apple-style ── */}
