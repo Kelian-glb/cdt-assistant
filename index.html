@@ -2444,7 +2444,7 @@ function CalcBriques() {
 
   const [fmt, setFmt]       = useState("Bio Bric (560×274×200 mm)");
   const [vMur, setVMur]     = useState({});
-  const [ouvs, setOuvs]     = useState([{ id:1, label:"Fenêtre", L:"", H:"", qty:1 }]);
+  const [ouvs, setOuvs]     = useState([]);
   const [poteaux, setPoteaux] = useState([]);
   const [res, setRes]       = useState(null);
 
@@ -2545,17 +2545,17 @@ function CalcBriques() {
 
         {/* ouvertures + poteaux */}
         <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          <div style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
-            {["Type","Nom","L (m)","H (m)","Qté",""].map((h,i) => (
-              <span key={i} style={{ fontSize:10, fontWeight:700, color:C.muted, letterSpacing:".06em", textTransform:"uppercase", textAlign:i>=4?"center":"left" }}>{h}</span>
-            ))}
-          </div>
+          {(ouvs.length > 0 || poteaux.length > 0) && (
+            <div style={{ display:"grid", gridTemplateColumns:"90px 1fr 1fr 76px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
+              {["Type","L (m)","H (m)","Qté",""].map((h,i) => (
+                <span key={i} style={{ fontSize:10, fontWeight:700, color:C.muted, letterSpacing:".06em", textTransform:"uppercase", textAlign:i>=3?"center":"left" }}>{h}</span>
+              ))}
+            </div>
+          )}
 
           {ouvs.map(o => (
-            <div key={o.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
+            <div key={o.id} style={{ display:"grid", gridTemplateColumns:"90px 1fr 1fr 76px 26px", gap:6, alignItems:"center" }}>
               <span style={{ fontSize:11, fontWeight:600, color:C.blue, background:"#dbeafe", borderRadius:6, padding:"3px 4px", textAlign:"center" }}>Ouverture</span>
-              <input value={o.label} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,label:e.target.value}:x))} placeholder="Fenêtre…"
-                style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
               <input type="number" value={o.L} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,L:e.target.value}:x))} placeholder="L"
                 style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 4px", fontSize:12, fontFamily:"inherit", outline:"none", width:"100%", textAlign:"center" }} />
               <input type="number" value={o.H} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,H:e.target.value}:x))} placeholder="H"
@@ -2572,10 +2572,8 @@ function CalcBriques() {
           ))}
 
           {poteaux.map(p => (
-            <div key={p.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
+            <div key={p.id} style={{ display:"grid", gridTemplateColumns:"90px 1fr 1fr 76px 26px", gap:6, alignItems:"center" }}>
               <span style={{ fontSize:11, fontWeight:600, color:"#92400e", background:"#fef3c7", borderRadius:6, padding:"3px 4px", textAlign:"center" }}>Poteau</span>
-              <input value={p.label} onChange={e => updPoteau(p.id,"label",e.target.value)} placeholder="Poteau…"
-                style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
               <div style={{ background:"#f5f4f0", borderRadius:8, padding:"5px 4px", fontSize:11, color:C.muted, textAlign:"center", border:`1px solid ${C.border}` }}>{f.ep}mm</div>
               <input type="number" value={p.H} onChange={e => updPoteau(p.id,"H",e.target.value)} placeholder="H"
                 style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 4px", fontSize:12, fontFamily:"inherit", outline:"none", width:"100%", textAlign:"center" }} />
