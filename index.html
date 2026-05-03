@@ -371,6 +371,32 @@ function useSupaCR(userId) {
   return { crs, saveCR, delCR };
 }
 
+// ── Hook PV ───────────────────────────────────────────────────────────────
+function useSupaPV(userId) {
+  const [pvs, setPvs] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("pv_receptions").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      .then(({ data }) => setPvs(data || []));
+  }, [userId]);
+
+  const savePV = async (pv) => {
+    const payload = { ...pv, user_id: userId };
+    delete payload.id;
+    const { data } = await supabase.from("pv_receptions").insert(payload).select().single();
+    setPvs(prev => [data, ...(prev||[])]);
+    return data;
+  };
+
+  const delPV = async (id) => {
+    await supabase.from("pv_receptions").delete().eq("id", id);
+    setPvs(prev => (prev||[]).filter(p => p.id !== id));
+  };
+
+  return { pvs, savePV, delPV };
+}
+
 // ── Hook Métrés ────────────────────────────────────────────────────────────
 function useSupaMetres(userId) {
   const [items, setItems] = useState(null);
@@ -1768,10 +1794,11 @@ function SignaturePad({ label, value, onChange }) {
   );
 }
 
-function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
+function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise }) {
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
   const { crs, saveCR, delCR } = supaCR;
+  const { pvs, savePV, delPV } = supaPV;
   const { chantiers } = supaChantiers;
   const { entreprise, save: saveEntreprise } = supaEntreprise;
 
@@ -1788,6 +1815,12 @@ function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
   const [saved, setSaved] = useState(false);
   const [viewingCR, setViewingCR] = useState(null);
 
+  // ── PV sauvegarde ──
+  const [pvSaving, setPvSaving] = useState(false);
+  const [pvSaved, setPvSaved] = useState(false);
+  const [viewingPV, setViewingPV] = useState(null);
+  const [histoType, setHistoType] = useState("cr"); // "cr" | "pv"
+
   // ── Signatures ──
   const [sigCRConducteur, setSigCRConducteur] = useState(null);
   const [sigCRMO, setSigCRMO] = useState(null);
@@ -1800,6 +1833,8 @@ function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
     travaux:"", reserves:"", observations:"", dateLeveReserves:"",
   });
   const [pvOutput, setPvOutput] = useState("");
+
+  useEffect(() => { setPvSaved(false); }, [pv]);
 
   // ── Génération CR ──
   const generate = () => {
@@ -1851,6 +1886,13 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
     setSaving(true);
     await saveCR({ chantier:cr.chantier, date:cr.date, conducteur:cr.conducteurTravaux, maitrise_ouvrage:cr.maitriseOuvrage, presents_entreprises:cr.presentsEntreprises, presents_client:cr.presentsClient, avancement:cr.avancement, points_avalides:cr.pointsAvalides, problemes:cr.problemes, decisions:cr.decisionsRetenues, reserves_levees:cr.reservesLevees, reserves_nouvelles:cr.reservesNouvelles, prochain_rdv:cr.prochainRdv, contenu:output });
     setSaving(false); setSaved(true);
+  };
+
+  const savePVToSupabase = async () => {
+    if (!pvOutput || pvSaving) return;
+    setPvSaving(true);
+    await savePV({ chantier:pv.chantier, artisan:pv.artisan, metier:pv.metier, date:pv.date, conducteur:pv.conducteur, travaux:pv.travaux, reserves:pv.reserves, observations:pv.observations, date_leve_reserves:pv.dateLeveReserves||null, contenu:pvOutput });
+    setPvSaving(false); setPvSaved(true);
   };
 
   // ── Génération PV ──
@@ -1928,7 +1970,7 @@ ${buildEnteteHTML(ent_)}
       <div style={{ display:"flex", background:C.surface2, borderRadius:10, padding:3, overflowX:"auto", width:"fit-content", maxWidth:"100%" }}>
         {tabBtn("form","✏️ Nouveau CR")}
         {tabBtn("pv","📝 PV Réception")}
-        {tabBtn("historique",`📚 Historique (${(crs||[]).length})`)}
+        {tabBtn("historique",`📚 Historique (${(crs||[]).length + (pvs||[]).length})`)}
       </div>
 
       {/* ── NOUVEAU CR ── */}
@@ -1985,45 +2027,60 @@ ${buildEnteteHTML(ent_)}
       )}
 
       {/* ── HISTORIQUE ── */}
-      {view === "historique" && (
-        <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":(viewingCR?"1fr 1fr":"1fr"), gap:16, flex:1 }}>
-          <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, fontSize:13, fontWeight:600 }}>
-              {(crs||[]).length} CR sauvegardé{(crs||[]).length>1?"s":""}
-            </div>
-            <div style={{ overflowY:"auto", flex:1 }}>
-              {(crs||[]).length===0 && <div style={{ color:C.muted, textAlign:"center", padding:"40px 20px", fontSize:14 }}>Aucun CR sauvegardé</div>}
-              {(crs||[]).map(c => (
-                <div key={c.id} onClick={() => setViewingCR(viewingCR?.id===c.id?null:c)}
-                  style={{ padding:"14px 18px", cursor:"pointer", borderBottom:`1px solid ${C.border}`, background:viewingCR?.id===c.id?C.blueL:"transparent" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div style={{ fontWeight:600, fontSize:14 }}>{c.chantier || "Sans titre"}</div>
-                    <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                      {viewingCR?.id===c.id && <button onClick={e=>{e.stopPropagation();exportPDF(c.contenu||"",`CR — ${c.chantier}`);}} style={{ background:"none", border:`1px solid ${C.border}`, color:C.muted, cursor:"pointer", fontSize:11, borderRadius:6, padding:"2px 8px", fontFamily:"inherit" }}>🖨️ PDF</button>}
-                      <button onClick={e=>{e.stopPropagation();delCR(c.id);}} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:16, opacity:.6 }}>×</button>
-                    </div>
-                  </div>
-                  <div style={{ color:C.muted, fontSize:12, marginTop:3 }}>{c.conducteur} · {c.date?new Date(c.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):""}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {viewingCR && (
-            <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
-                <span style={{ fontWeight:600, fontSize:13 }}>{viewingCR.chantier}</span>
-                <div style={{ display:"flex", gap:6 }}>
-                  <Btn small variant="ghost" onClick={()=>copy(viewingCR.contenu||"")}>📋 Copier</Btn>
-                  <button onClick={()=>setViewingCR(null)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:20 }}>×</button>
-                </div>
+      {view === "historique" && (() => {
+        const viewing = histoType === "cr" ? viewingCR : viewingPV;
+        const setViewing = histoType === "cr" ? setViewingCR : setViewingPV;
+        const items = histoType === "cr" ? (crs||[]) : (pvs||[]);
+        const delItem = histoType === "cr" ? delCR : delPV;
+        const subtitle = (item) => histoType === "cr"
+          ? `${item.conducteur||""} · ${item.date?new Date(item.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):""}`
+          : `${item.artisan||""} · ${item.date?new Date(item.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):""}`;
+        return (
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":(viewing?"1fr 1fr":"1fr"), gap:16, flex:1 }}>
+            <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              <div style={{ padding:"10px 14px", borderBottom:`1px solid ${C.border}`, display:"flex", gap:6 }}>
+                {[["cr","CR réunion"],["pv","PV réception"]].map(([id,lbl]) => (
+                  <button key={id} onClick={() => { setHistoType(id); setViewingCR(null); setViewingPV(null); }} style={{
+                    background: histoType===id ? C.blue+"18" : "transparent", border: histoType===id ? `1px solid ${C.blue}40` : `1px solid ${C.border}`,
+                    borderRadius:8, padding:"5px 14px", fontSize:12, fontWeight: histoType===id ? 600 : 400,
+                    color: histoType===id ? C.blue : C.muted, cursor:"pointer", fontFamily:"inherit",
+                  }}>{lbl} ({histoType==="cr"&&id==="cr" ? (crs||[]).length : histoType==="pv"&&id==="pv" ? (pvs||[]).length : id==="cr" ? (crs||[]).length : (pvs||[]).length})</button>
+                ))}
               </div>
-              <pre style={{ flex:1, overflowY:"auto", margin:0, padding:18, color:C.text, fontSize:12, lineHeight:1.8, fontFamily:"'Courier New',monospace", whiteSpace:"pre-wrap", background:C.surface2, borderRadius:"0 0 16px 16px" }}>
-                {viewingCR.contenu || "Contenu non disponible"}
-              </pre>
+              <div style={{ overflowY:"auto", flex:1 }}>
+                {items.length===0 && <div style={{ color:C.muted, textAlign:"center", padding:"40px 20px", fontSize:14 }}>Aucun document sauvegardé</div>}
+                {items.map(item => (
+                  <div key={item.id} onClick={() => setViewing(viewing?.id===item.id?null:item)}
+                    style={{ padding:"14px 18px", cursor:"pointer", borderBottom:`1px solid ${C.border}`, background:viewing?.id===item.id?C.blueL:"transparent" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <div style={{ fontWeight:600, fontSize:14 }}>{item.chantier || "Sans titre"}</div>
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        {viewing?.id===item.id && <button onClick={e=>{e.stopPropagation();exportPDF(item.contenu||"",`${histoType==="cr"?"CR":"PV"} — ${item.chantier}`);}} style={{ background:"none", border:`1px solid ${C.border}`, color:C.muted, cursor:"pointer", fontSize:11, borderRadius:6, padding:"2px 8px", fontFamily:"inherit" }}>🖨️ PDF</button>}
+                        <button onClick={e=>{e.stopPropagation();delItem(item.id);if(viewing?.id===item.id)setViewing(null);}} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:16, opacity:.6 }}>×</button>
+                      </div>
+                    </div>
+                    <div style={{ color:C.muted, fontSize:12, marginTop:3 }}>{subtitle(item)}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
-      )}
+            {viewing && (
+              <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
+                  <span style={{ fontWeight:600, fontSize:13 }}>{viewing.chantier}</span>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <Btn small variant="ghost" onClick={()=>copy(viewing.contenu||"")}>📋 Copier</Btn>
+                    <button onClick={()=>setViewing(null)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:20 }}>×</button>
+                  </div>
+                </div>
+                <pre style={{ flex:1, overflowY:"auto", margin:0, padding:18, color:C.text, fontSize:12, lineHeight:1.8, fontFamily:"'Courier New',monospace", whiteSpace:"pre-wrap", background:C.surface2, borderRadius:"0 0 16px 16px" }}>
+                  {viewing.contenu || "Contenu non disponible"}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── PV DE RÉCEPTION ── */}
       {view === "pv" && (
@@ -2061,7 +2118,8 @@ ${buildEnteteHTML(ent_)}
               {pvOutput && (
                 <div style={{ display:"flex", gap:6 }}>
                   <Btn small variant="ghost" onClick={() => copy(pvOutput)}>📋 Copier</Btn>
-                  <Btn small onClick={() => exportPVPDF(pv, entreprise, sigPVConducteur, sigPVArtisan)}>🖨️ PDF</Btn>
+                  <Btn small variant="ghost" onClick={() => exportPVPDF(pv, entreprise, sigPVConducteur, sigPVArtisan)}>🖨️ PDF</Btn>
+                  <Btn small onClick={savePVToSupabase} disabled={pvSaving||pvSaved}>{pvSaved?"✅ Sauvegardé":pvSaving?"...":"💾 Sauvegarder"}</Btn>
                 </div>
               )}
             </div>
@@ -3293,6 +3351,7 @@ function App() {
   const supaSettings   = useSupaSettings(user?.id);
   const supaSettings2  = supaSettings;
   const supaCR         = useSupaCR(user?.id);
+  const supaPV         = useSupaPV(user?.id);
   const supaMetres     = useSupaMetres(user?.id);
   const supaEntreprise = useSupaEntreprise(user?.id);
   const [pdfStore, setPdfStore] = useState({});
@@ -3441,7 +3500,7 @@ function App() {
       <div style={{ flex: 1, padding: mob ? "16px 14px" : "24px 28px", overflow: "auto", overflowX: "hidden", maxWidth: 1400, width: "100%", margin: "0 auto", boxSizing: "border-box", paddingBottom: mob ? 80 : undefined }}>
         {tab === "dashboard"  && <TabDashboard userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} userLabel={userLabel} onNavigate={setTab} />}
         {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} />}
-        {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
+        {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
         {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
         {tab === "documents"  && <TabDocuments supaChantiers={supaChantiers} pdfStore={pdfStore} setPdfStore={setPdfStore} />}
       </div>
