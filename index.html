@@ -1772,7 +1772,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
         </div>
 
         {/* détail / form */}
-        <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflowY:"auto", boxShadow:"0 1px 4px rgba(0,0,0,.05)", display:"flex", flexDirection:"column" }}>
+        <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflowY:"auto", overflowX:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.05)", display:"flex", flexDirection:"column" }}>
           {form !== null ? (
             <div style={{ padding:22, display:"flex", flexDirection:"column", gap:14 }}>
               <h3 style={{ margin:0, color:"#1a1a1a", fontSize:13, fontWeight:700, letterSpacing:".04em", textTransform:"uppercase" }}>{form==="new"?"Nouveau chantier":"Modifier"}</h3>
@@ -4313,7 +4313,7 @@ function App() {
 
       <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, height:"100vh", overflow:"hidden" }}>
         <AppHeader mob={mob} setSidebarOpen={setSidebarOpen} notifCount={notifCount} onNavigate={setTab} />
-        <div style={{ flex:1, overflow:"auto", padding: mob ? "16px 14px" : "24px 28px", paddingBottom: mob ? 80 : 24 }}>
+        <div style={{ flex:1, overflowY:"auto", overflowX: mob ? "hidden" : "auto", padding: mob ? "16px 14px" : "24px 28px", paddingBottom: mob ? 80 : 24 }}>
           {tab === "dashboard"  && <TabDashboard userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} userLabel={userLabel} onNavigate={setTab} notifCount={notifCount} />}
           {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} />}
           {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
