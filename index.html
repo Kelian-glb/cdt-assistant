@@ -642,7 +642,7 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
 
 <!-- PAGE 1 -->
 <div style="text-align:center;margin-bottom:8px">
-  <img src="${logoUrl}" style="height:110px;max-width:300px;object-fit:contain" onerror="this.style.display='none'"/>
+  <img src="${logoUrl}" style="height:160px;max-width:380px;object-fit:contain" onerror="this.style.display='none'"/>
 </div>
 <div style="text-align:center;margin-bottom:16px">
   <h1>Procès Verbal de Réception par Lot</h1>
@@ -702,7 +702,7 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
 <!-- PAGE 2 -->
 <div class="page-break" style="padding-top:28px">
   <div style="text-align:center;margin-bottom:12px">
-    <img src="${logoUrl}" style="height:90px;max-width:260px;object-fit:contain" onerror="this.style.display='none'"/>
+    <img src="${logoUrl}" style="height:130px;max-width:320px;object-fit:contain" onerror="this.style.display='none'"/>
   </div>
   <div style="text-align:center;margin-bottom:20px">
     <h1>Liste des Lots</h1>
@@ -732,7 +732,7 @@ function LogoPicker({ logos, selectedUrl, onSelect, onUpload, onDelete }) {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const maxH = 160;
+        const maxH = 500;
         const ratio = Math.min(1, maxH / img.height);
         canvas.width = Math.round(img.width * ratio);
         canvas.height = Math.round(img.height * ratio);
@@ -2501,22 +2501,27 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise }) {
   const sigMOERef = React.useRef();
   const sigSTRef  = React.useRef();
 
-  // ── Logos sauvegardés ──
-  const savedLogos = entreprise?.logos || [];
+  // ── Logos sauvegardés (localStorage) ──
+  const LOGOS_KEY = `pv_logos_${userId}`;
+  const [savedLogos, setSavedLogos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`pv_logos_${userId}`) || "[]"); } catch { return []; }
+  });
 
-  const uploadLogo = async (name, dataUrl) => {
+  const persistLogos = (logos) => {
+    setSavedLogos(logos);
+    try { localStorage.setItem(LOGOS_KEY, JSON.stringify(logos)); } catch {}
+  };
+
+  const uploadLogo = (name, dataUrl) => {
     const newLogo = { id: Date.now(), name, dataUrl };
-    const logos = [...savedLogos, newLogo];
-    await saveEntreprise({ ...(entreprise||{}), logos });
+    persistLogos([...savedLogos, newLogo]);
     setPv(p => ({ ...p, logoUrl: dataUrl }));
   };
 
-  const deleteLogo = async (id) => {
-    const logos = savedLogos.filter(l => l.id !== id);
-    await saveEntreprise({ ...(entreprise||{}), logos });
-    if (pv.logoUrl === savedLogos.find(l => l.id === id)?.dataUrl) {
-      setPv(p => ({ ...p, logoUrl: "" }));
-    }
+  const deleteLogo = (id) => {
+    const removed = savedLogos.find(l => l.id === id);
+    persistLogos(savedLogos.filter(l => l.id !== id));
+    if (removed && pv.logoUrl === removed.dataUrl) setPv(p => ({ ...p, logoUrl: "" }));
   };
 
   // ── Entreprise state ──
