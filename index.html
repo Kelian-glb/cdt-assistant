@@ -1093,7 +1093,7 @@ function ChecklistPanel({ chantier, onUpdate, modeles }) {
 // ══════════════════════════════════════════════════════════════════════════
 // TAB 0 — TABLEAU DE BORD
 // ══════════════════════════════════════════════════════════════════════════
-function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNavigate }) {
+function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNavigate, notifCount=0 }) {
   const mob = useIsMobile();
   const { chantiers } = supaChantiers;
   const { settings } = supaSettings;
@@ -1191,10 +1191,41 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
     <div style={{ display:"flex", flexDirection:"column", gap:mob?12:20, maxWidth:1300 }}>
 
       {/* Greeting */}
-      <div>
-        <div style={{ fontSize:mob?20:26, fontWeight:700, color:C.text, letterSpacing:"-.02em" }}>{salut}, {userLabel.split(" ")[0]} 👋</div>
-        {!mob && <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>
-          Voici le résumé de votre activité ce {new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}.
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:16 }}>
+        <div>
+          <div style={{ fontSize:mob?20:26, fontWeight:700, color:C.text, letterSpacing:"-.02em" }}>{salut}, {userLabel.split(" ")[0]} 👋</div>
+          {!mob && <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>
+            Voici le résumé de votre activité ce {new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}.
+          </div>}
+        </div>
+        {!mob && <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+          {/* Barre de recherche */}
+          <div style={{ position:"relative", display:"flex", alignItems:"center" }}>
+            <svg style={{ position:"absolute", left:13, pointerEvents:"none", color:C.muted }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input placeholder="Rechercher un chantier, document, calcul..."
+              style={{ width:340, padding:"9px 14px 9px 38px", borderRadius:12, border:"1.5px solid rgba(0,0,0,.09)", fontSize:13, fontFamily:"inherit", outline:"none", background:"#fff", color:C.text, boxSizing:"border-box" }}
+              onFocus={e => e.target.style.borderColor=C.blue+"70"}
+              onBlur={e => e.target.style.borderColor="rgba(0,0,0,.09)"}
+            />
+          </div>
+          {/* Cloche */}
+          <div style={{ position:"relative" }}>
+            <button style={{ width:40, height:40, borderRadius:12, background:"#fff", border:`1px solid rgba(0,0,0,.09)`, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 1px 3px rgba(0,0,0,.05)" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+            </button>
+            {notifCount > 0 && <div style={{ position:"absolute", top:-5, right:-5, minWidth:18, height:18, background:C.blue, borderRadius:99, fontSize:10, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, padding:"0 4px", border:"2px solid #f5f4f0" }}>{notifCount}</div>}
+          </div>
+          {/* Bouton Nouveau chantier */}
+          <button onClick={() => onNavigate("chantiers")} style={{ background:"#f0ebe0", color:C.text, border:"1px solid rgba(0,0,0,.09)", borderRadius:99, padding:"9px 20px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}
+            onMouseEnter={e => e.currentTarget.style.background="#e8e2d4"}
+            onMouseLeave={e => e.currentTarget.style.background="#f0ebe0"}>
+            + Nouveau chantier
+          </button>
         </div>}
       </div>
 
@@ -3780,57 +3811,23 @@ function SidebarContent({ tab, setTab, logout, userLabel, onClose, onEntreprise 
   );
 }
 
-// ── AppHeader ──────────────────────────────────────────────────────────────
-function AppHeader({ mob, setSidebarOpen, notifCount, onNavigate }) {
-  const [search, setSearch] = useState("");
+// ── AppHeader (mobile only) ────────────────────────────────────────────────
+function AppHeader({ mob, setSidebarOpen, notifCount }) {
+  if (!mob) return null;
   return (
-    <div style={{ height:mob?52:64, background:"#fff", borderBottom:"1px solid rgba(0,0,0,.06)", display:"flex", alignItems:"center", padding:mob?"0 14px":"0 28px", gap:12, flexShrink:0, zIndex:10 }}>
-      {mob && (
-        <button onClick={() => setSidebarOpen(o => !o)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
-          <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
-          <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
-          <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
-        </button>
-      )}
-      {mob
-        ? <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
-            <img src="https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png" style={{ height:22, width:"auto" }} alt="BATIR"/>
-          </div>
-        : <>
-            <div style={{ flex:1 }}/>
-            <div style={{ position:"relative", display:"flex", alignItems:"center", width:400 }}>
-              <svg style={{ position:"absolute", left:14, pointerEvents:"none", color:C.muted }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Rechercher un chantier, document, calcul..."
-                style={{ width:"100%", padding:"10px 14px 10px 42px", borderRadius:12, border:"1.5px solid rgba(0,0,0,.09)", fontSize:13, fontFamily:"inherit", outline:"none", background:"#f5f4f0", color:C.text, boxSizing:"border-box" }}
-                onFocus={e => e.target.style.borderColor=C.blue+"70"}
-                onBlur={e => e.target.style.borderColor="rgba(0,0,0,.09)"}
-              />
-            </div>
-            <div style={{ position:"relative", flexShrink:0 }}>
-              <button style={{ width:42, height:42, borderRadius:12, background:C.surface2, border:`1px solid ${C.border}`, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-              </button>
-              {notifCount > 0 && <div style={{ position:"absolute", top:-5, right:-5, minWidth:18, height:18, background:C.blue, borderRadius:99, fontSize:10, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, padding:"0 4px", border:"2px solid #fff" }}>{notifCount}</div>}
-            </div>
-            <button onClick={() => onNavigate && onNavigate("chantiers")} style={{ background:"#f0ebe0", color:C.text, border:"1px solid rgba(0,0,0,.09)", borderRadius:99, padding:"10px 22px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:8, whiteSpace:"nowrap", flexShrink:0, boxShadow:"0 1px 3px rgba(0,0,0,.06)" }}
-              onMouseEnter={e => e.currentTarget.style.background="#e8e2d4"}
-              onMouseLeave={e => e.currentTarget.style.background="#f0ebe0"}>
-              + Nouveau chantier
-            </button>
-          </>
-      }
-      {mob && (
-        <div style={{ position:"relative", flexShrink:0 }}>
-          <button style={{ background:"none", border:"none", cursor:"pointer", fontSize:20, lineHeight:1, display:"flex" }}>🔔</button>
-          {notifCount > 0 && <div style={{ position:"absolute", top:-3, right:-3, minWidth:16, height:16, background:C.red, borderRadius:99, fontSize:9, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, padding:"0 4px" }}>{notifCount}</div>}
-        </div>
-      )}
+    <div style={{ height:52, background:"#fff", borderBottom:"1px solid rgba(0,0,0,.06)", display:"flex", alignItems:"center", padding:"0 14px", gap:8, flexShrink:0, zIndex:10 }}>
+      <button onClick={() => setSidebarOpen(o => !o)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
+        <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
+        <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
+        <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
+      </button>
+      <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
+        <img src="https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png" style={{ height:22, width:"auto" }} alt="BATIR"/>
+      </div>
+      <div style={{ position:"relative", flexShrink:0 }}>
+        <button style={{ background:"none", border:"none", cursor:"pointer", fontSize:20, lineHeight:1, display:"flex" }}>🔔</button>
+        {notifCount > 0 && <div style={{ position:"absolute", top:-3, right:-3, minWidth:16, height:16, background:C.red, borderRadius:99, fontSize:9, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, padding:"0 4px" }}>{notifCount}</div>}
+      </div>
     </div>
   );
 }
@@ -3952,7 +3949,7 @@ function App() {
       <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, height:"100vh", overflow:"hidden" }}>
         <AppHeader mob={mob} setSidebarOpen={setSidebarOpen} notifCount={notifCount} onNavigate={setTab} />
         <div style={{ flex:1, overflow:"auto", padding: mob ? "16px 14px" : "24px 28px", paddingBottom: mob ? 80 : 24 }}>
-          {tab === "dashboard"  && <TabDashboard userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} userLabel={userLabel} onNavigate={setTab} />}
+          {tab === "dashboard"  && <TabDashboard userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} userLabel={userLabel} onNavigate={setTab} notifCount={notifCount} />}
           {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} />}
           {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
           {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
