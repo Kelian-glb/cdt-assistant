@@ -382,6 +382,42 @@ function useSupaSettings(userId) {
   return { settings, saveSettings };
 }
 
+// ── Hook Logos ──────────────────────────────────────────────────────────────
+function useSupaLogos(userId) {
+  const [logos, setLogos] = useState([]);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("user_settings").select("logos").eq("user_id", userId).maybeSingle()
+      .then(({ data }) => setLogos(data?.logos || []));
+  }, [userId]);
+
+  const _upsert = async (newLogos) => {
+    const { data: existing } = await supabase.from("user_settings").select("id").eq("user_id", userId).maybeSingle();
+    if (existing) {
+      await supabase.from("user_settings").update({ logos: newLogos, updated_at: new Date().toISOString() }).eq("user_id", userId);
+    } else {
+      await supabase.from("user_settings").insert({ logos: newLogos, user_id: userId });
+    }
+  };
+
+  const saveLogo = async (name, dataUrl) => {
+    const newLogo = { id: Date.now(), name, dataUrl };
+    const updated = [...logos, newLogo];
+    setLogos(updated);
+    await _upsert(updated);
+    return newLogo;
+  };
+
+  const deleteLogo = async (id) => {
+    const updated = logos.filter(l => l.id !== id);
+    setLogos(updated);
+    await _upsert(updated);
+  };
+
+  return { logos, saveLogo, deleteLogo };
+}
+
 // ── Hook Entreprise ─────────────────────────────────────────────────────────
 function useSupaEntreprise(userId) {
   const [entreprise, setEntreprise] = useState(null);
@@ -2465,7 +2501,7 @@ function RappelsPanel({ chantier, onUpdate, phases }) {
 }
 
 
-function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise }) {
+function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogos }) {
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
   const { crs, saveCR, delCR } = supaCR;
@@ -2503,26 +2539,17 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise }) {
   const sigMOERef = React.useRef();
   const sigSTRef  = React.useRef();
 
-  // ── Logos sauvegardés (localStorage) ──
-  const LOGOS_KEY = `pv_logos_${userId}`;
-  const [savedLogos, setSavedLogos] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`pv_logos_${userId}`) || "[]"); } catch { return []; }
-  });
+  // ── Logos sauvegardés (Supabase user_settings) ──
+  const savedLogos = supaLogos?.logos || [];
 
-  const persistLogos = (logos) => {
-    setSavedLogos(logos);
-    try { localStorage.setItem(LOGOS_KEY, JSON.stringify(logos)); } catch {}
-  };
-
-  const uploadLogo = (name, dataUrl) => {
-    const newLogo = { id: Date.now(), name, dataUrl };
-    persistLogos([...savedLogos, newLogo]);
+  const uploadLogo = async (name, dataUrl) => {
+    await supaLogos?.saveLogo(name, dataUrl);
     setPv(p => ({ ...p, logoUrl: dataUrl }));
   };
 
-  const deleteLogo = (id) => {
+  const deleteLogo = async (id) => {
     const removed = savedLogos.find(l => l.id === id);
-    persistLogos(savedLogos.filter(l => l.id !== id));
+    await supaLogos?.deleteLogo(id);
     if (removed && pv.logoUrl === removed.dataUrl) setPv(p => ({ ...p, logoUrl: "" }));
   };
 
@@ -4606,6 +4633,7 @@ function App() {
   const supaPV         = useSupaPV(user?.id);
   const supaMetres     = useSupaMetres(user?.id);
   const supaEntreprise = useSupaEntreprise(user?.id);
+  const supaLogos      = useSupaLogos(user?.id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [entModalOpen, setEntModalOpen] = useState(false);
 
@@ -4662,7 +4690,7 @@ function App() {
         <div style={{ flex:1, overflowY:"auto", overflowX: mob ? "hidden" : "auto", padding: mob ? "16px 14px" : "24px 28px", paddingBottom: mob ? 80 : 24 }}>
           {tab === "dashboard"  && <TabDashboard userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} userLabel={userLabel} onNavigate={setTab} notifCount={notifCount} />}
           {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} />}
-          {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
+          {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} supaLogos={supaLogos} />}
           {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
           {tab === "documents"  && <TabDocuments />}
           {tab === "planning"   && <TabPlanning supaChantiers={supaChantiers} />}
