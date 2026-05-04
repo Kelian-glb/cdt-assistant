@@ -395,7 +395,12 @@ function useSupaMetres(userId) {
   useEffect(() => {
     if (!userId) return;
     supabase.from("metres").select("*").eq("user_id", userId).maybeSingle()
-      .then(({ data }) => setItems(data?.items || [{ id: 1, desc: "", qte: "", unite: "m²", pu: "" }]));
+      .then(({ data }) => {
+        const raw = data?.items || [];
+        // migration : anciens items avaient desc/qte/pu, nouveaux ont nom/prix
+        const migrated = raw.map(i => i.nom !== undefined ? i : { id: i.id, nom: i.desc || "", prix: i.pu || "" });
+        setItems(migrated);
+      });
   }, [userId]);
 
   const save = async (newItems) => {
@@ -2380,7 +2385,7 @@ const CORPS = [
   { id: "charpente", label: "Charpente / Couverture", icon: "🏡" },
   { id: "carrelage", label: "Carrelage",               icon: "🪟" },
   { id: "enduit",    label: "Enduit / Crépi",          icon: "🪣" },
-  { id: "metres",    label: "Métrés",                  icon: "📊" },
+  { id: "metres",    label: "Liste de prix",            icon: "🏷️" },
 ];
 
 // ── helpers partagés ───────────────────────────────────────────────────────
@@ -3247,70 +3252,129 @@ function CalcEnduit() {
 
 // ── TAB CALCULS ────────────────────────────────────────────────────────────
 // ── MÉTRÉS / QUANTITATIF (Supabase) ───────────────────────────────────────
-function CalcMetresSupa({ supaMetres }) {
-  const { items: rawItems, save } = supaMetres;
-  const items = rawItems.length > 0 ? rawItems : [{ id: 1, desc: "", qte: "", unite: "m²", pu: "" }];
+function CalcPrixList({ supaMetres }) {
+  const { items, save } = supaMetres;
+  const [query, setQuery]   = useState("");
+  const [draft, setDraft]   = useState({ nom:"", prix:"" });
+  const [searchFocus, setSearchFocus] = useState(false);
 
-  const upd = (id, k, v) => {
-    const next = items.map(i => i.id === id ? { ...i, [k]: v } : i);
-    save(next);
+  const filtered = (items || []).filter(i =>
+    !query.trim() || (i.nom||"").toLowerCase().includes(query.trim().toLowerCase())
+  );
+
+  const add = () => {
+    if (!draft.nom.trim()) return;
+    save([...items, { id: Date.now(), nom: draft.nom.trim(), prix: draft.prix }]);
+    setDraft({ nom:"", prix:"" });
   };
-  const add = () => save([...items, { id: Date.now(), desc: "", qte: "", unite: "m²", pu: "" }]);
-  const del = (id) => save(items.filter(i => i.id !== id));
-  const total = items.reduce((s, i) => s + parseFloat(i.qte||0) * parseFloat(i.pu||0), 0);
 
-  const inputS = { background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"6px 8px", fontSize:13, fontFamily:"inherit", outline:"none" };
+  const del = (id) => save(items.filter(i => i.id !== id));
+
+  const inputS = (extra={}) => ({
+    background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:10,
+    color:C.text, padding:"10px 14px", fontSize:13, fontFamily:"inherit",
+    outline:"none", boxSizing:"border-box", ...extra,
+  });
 
   return (
-    <CalcCard title="Métrés / Quantitatif — synchronisé avec votre compte">
-      <div style={{ overflowX:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr>
-              {["Description","Qté","Unité","P.U. (€)","Total (€)",""].map(h => (
-                <th key={h} style={{ textAlign:"left", color:C.muted, padding:"5px 8px", borderBottom:`1px solid ${C.border}`, fontWeight:500, fontSize:12 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(i => (
-              <tr key={i.id}>
-                <td style={{ padding:"4px 4px" }}>
-                  <input value={i.desc} onChange={e => upd(i.id,"desc",e.target.value)} placeholder="Ouvrage..."
-                    style={{ ...inputS, width:140 }} />
-                </td>
-                <td style={{ padding:"4px 4px" }}>
-                  <input type="number" value={i.qte} onChange={e => upd(i.id,"qte",e.target.value)} placeholder="0"
-                    style={{ ...inputS, width:60, textAlign:"center" }} />
-                </td>
-                <td style={{ padding:"4px 4px" }}>
-                  <select value={i.unite} onChange={e => upd(i.id,"unite",e.target.value)}
-                    style={{ ...inputS, width:70 }}>
-                    {["m²","m³","ml","u","kg","h","forfait"].map(u => <option key={u}>{u}</option>)}
-                  </select>
-                </td>
-                <td style={{ padding:"4px 4px" }}>
-                  <input type="number" value={i.pu} onChange={e => upd(i.id,"pu",e.target.value)} placeholder="0"
-                    style={{ ...inputS, width:75, textAlign:"center" }} />
-                </td>
-                <td style={{ padding:"4px 8px", color:C.text, fontWeight:600, fontSize:13 }}>
-                  {(parseFloat(i.qte||0)*parseFloat(i.pu||0)).toFixed(2)} €
-                </td>
-                <td><button onClick={() => del(i.id)} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:16 }}>×</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:4 }}>
-        <Btn small onClick={add}>+ Ligne</Btn>
-        <div style={{ background:"#1c1c1e", borderRadius:10, padding:"10px 18px", display:"flex", gap:14, alignItems:"center" }}>
-          <span style={{ color:"rgba(255,255,255,.6)", fontSize:12, fontWeight:500 }}>TOTAL HT</span>
-          <span style={{ color:"#fff", fontWeight:700, fontSize:20 }}>{total.toFixed(2)} €</span>
+    <CalcCard title="">
+      {/* En-tête */}
+      <div style={{ marginBottom:20 }}>
+        <div style={{ fontSize:17, fontWeight:700, color:C.text, letterSpacing:"-.01em" }}>Liste de prix</div>
+        <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>
+          {items.length} produit{items.length !== 1 ? "s" : ""} enregistré{items.length !== 1 ? "s" : ""} · synchronisé avec votre compte
         </div>
       </div>
-      <div style={{ color:C.muted, fontSize:11 }}>☁️ Sauvegardé automatiquement dans votre compte.</div>
+
+      {/* Barre de recherche */}
+      <div style={{ position:"relative", marginBottom:16 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={searchFocus ? C.text : C.muted}
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          style={{ position:"absolute", left:13, top:"50%", transform:"translateY(-50%)", pointerEvents:"none", transition:"stroke .15s" }}>
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onFocus={() => setSearchFocus(true)}
+          onBlur={() => setSearchFocus(false)}
+          placeholder="Rechercher un produit ou matériau..."
+          style={{ ...inputS(), width:"100%", paddingLeft:40,
+            boxShadow: searchFocus ? `0 0 0 3px ${C.text}15` : "none",
+            border: `1.5px solid ${searchFocus ? C.text+"50" : C.border}`, transition:"border-color .15s, box-shadow .15s" }}
+        />
+        {query && (
+          <button onClick={() => setQuery("")}
+            style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+              background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:18, lineHeight:1, padding:0 }}>
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Liste */}
+      <div style={{ display:"flex", flexDirection:"column", gap:1, borderRadius:14, overflow:"hidden",
+        border:`1px solid ${C.border}`, marginBottom:20, minHeight:60 }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding:"28px 20px", textAlign:"center", color:C.muted, fontSize:13 }}>
+            {query ? `Aucun résultat pour « ${query} »` : "Aucun prix enregistré — ajoutez-en un ci-dessous."}
+          </div>
+        ) : filtered.map((item, idx) => (
+          <div key={item.id}
+            style={{ display:"flex", alignItems:"center", padding:"12px 16px",
+              background: idx % 2 === 0 ? "#fff" : C.surface2,
+              borderBottom: idx < filtered.length-1 ? `1px solid ${C.border}` : "none" }}>
+            <div style={{ flex:1, fontSize:13, fontWeight:500, color:C.text }}>{item.nom}</div>
+            <div style={{ fontSize:14, fontWeight:700, color:C.text, marginRight:14 }}>
+              {parseFloat(item.prix||0).toLocaleString("fr-FR", { minimumFractionDigits:2, maximumFractionDigits:2 })} €
+            </div>
+            <button onClick={() => del(item.id)}
+              style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:18,
+                lineHeight:1, padding:"2px 4px", borderRadius:6, opacity:.6 }}
+              onMouseEnter={e => { e.currentTarget.style.color=C.red; e.currentTarget.style.opacity="1"; }}
+              onMouseLeave={e => { e.currentTarget.style.color=C.muted; e.currentTarget.style.opacity=".6"; }}>
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Formulaire d'ajout */}
+      <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:18 }}>
+        <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".07em", textTransform:"uppercase", marginBottom:10 }}>
+          Ajouter un prix
+        </div>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <input
+            value={draft.nom}
+            onChange={e => setDraft(d => ({ ...d, nom: e.target.value }))}
+            onKeyDown={e => e.key === "Enter" && add()}
+            placeholder="Nom du produit ou matériau..."
+            style={{ ...inputS(), flex:1 }}
+          />
+          <div style={{ position:"relative", flexShrink:0 }}>
+            <input
+              type="number"
+              value={draft.prix}
+              onChange={e => setDraft(d => ({ ...d, prix: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && add()}
+              placeholder="0.00"
+              min="0"
+              style={{ ...inputS(), width:110, paddingRight:26, textAlign:"right" }}
+            />
+            <span style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+              color:C.muted, fontSize:13, pointerEvents:"none" }}>€</span>
+          </div>
+          <button
+            onClick={add}
+            disabled={!draft.nom.trim()}
+            style={{ background: draft.nom.trim() ? C.text : C.border, color:"#fff", border:"none",
+              borderRadius:10, padding:"10px 18px", fontSize:13, fontWeight:600, cursor: draft.nom.trim() ? "pointer" : "default",
+              fontFamily:"inherit", flexShrink:0, transition:"background .15s", whiteSpace:"nowrap" }}>
+            + Ajouter
+          </button>
+        </div>
+      </div>
     </CalcCard>
   );
 }
@@ -3349,7 +3413,7 @@ function TabCalculs({ supaMetres }) {
         {corps==="charpente" && <CalcCharpente />}
         {corps==="carrelage" && <CalcCarrelage />}
         {corps==="enduit"    && <CalcEnduit />}
-        {corps==="metres"    && <CalcMetresSupa supaMetres={supaMetres} />}
+        {corps==="metres"    && <CalcPrixList supaMetres={supaMetres} />}
       </div>
     </div>
   );
