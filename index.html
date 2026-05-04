@@ -1151,7 +1151,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
   const heure = new Date().getHours();
   const salut = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
-  const card = (extra={}) => ({ background:"#fff", borderRadius:16, padding:"18px 20px", border:"1px solid rgba(0,0,0,.06)", boxShadow:"0 1px 4px rgba(0,0,0,.05)", ...extra });
+  const card = (extra={}) => ({ background:"#fff", borderRadius:mob?12:16, padding:mob?"12px 14px":"18px 20px", border:"1px solid rgba(0,0,0,.06)", boxShadow:"0 1px 4px rgba(0,0,0,.05)", ...extra });
 
   const DonutScore = ({ score, color }) => {
     const r=40, cx=55, cy=55, circ=2*Math.PI*r, prog=(score/100)*circ;
@@ -1188,13 +1188,39 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
   };
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:18, maxWidth:1300 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:mob?12:18, maxWidth:1300 }}>
 
       {/* Greeting */}
       <div>
-        <div style={{ fontSize:mob?20:24, fontWeight:700, color:C.text, letterSpacing:"-.02em" }}>{salut}, {userLabel.split(" ")[0]} 👋</div>
-        <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Voici le résumé de votre activité aujourd'hui.</div>
+        <div style={{ fontSize:mob?18:24, fontWeight:700, color:C.text, letterSpacing:"-.02em" }}>{salut}, {userLabel.split(" ")[0]} 👋</div>
+        {!mob && <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Voici le résumé de votre activité aujourd'hui.</div>}
       </div>
+
+      {/* Mobile: résumé rapide + actions rapides */}
+      {mob && (
+        <>
+          <div style={{ background:"#fff", borderRadius:12, padding:"10px 14px", border:"1px solid rgba(0,0,0,.06)", display:"flex", flexWrap:"wrap", gap:10, alignItems:"center", fontSize:12 }}>
+            <span><strong style={{ color:C.text }}>{chantiers.length}</strong> <span style={{ color:C.muted }}>chantier{chantiers.length>1?"s":""}</span></span>
+            <span style={{ color:C.border }}>·</span>
+            <span><strong style={{ color:C.blue }}>{enCours}</strong> <span style={{ color:C.muted }}>en cours</span></span>
+            {bloques > 0 && <><span style={{ color:C.border }}>·</span><span><strong style={{ color:C.red }}>{bloques}</strong> <span style={{ color:C.muted }}>bloqué{bloques>1?"s":""}</span></span></>}
+            {rappelsRetard.length > 0 && <><span style={{ color:C.border }}>·</span><span><strong style={{ color:C.orange }}>{rappelsRetard.length}</strong> <span style={{ color:C.muted }}>alerte{rappelsRetard.length>1?"s":""}</span></span></>}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            {[
+              { icon:"➕", label:"Nouveau chantier", action:() => onNavigate("chantiers") },
+              { icon:"📐", label:"Calculs",          action:() => onNavigate("calculs") },
+              { icon:"📝", label:"Créer un PV",      action:() => onNavigate("cr") },
+              { icon:"📁", label:"Documents",        action:() => onNavigate("documents") },
+            ].map((a,i) => (
+              <button key={i} onClick={a.action} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background:"#fff", border:"1px solid rgba(0,0,0,.06)", borderRadius:12, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 1px 3px rgba(0,0,0,.04)" }}>
+                <span style={{ fontSize:20 }}>{a.icon}</span>
+                <span style={{ fontSize:12, color:C.text, fontWeight:500, textAlign:"left", lineHeight:1.3 }}>{a.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Row 1: Score + Alertes + Prochaine action */}
       <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr", gap:14 }}>
@@ -1251,8 +1277,8 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         </div>
       </div>
 
-      {/* Row 2: Stats */}
-      <div style={{ display:"grid", gridTemplateColumns:mob?"1fr 1fr":"repeat(5,1fr)", gap:10 }}>
+      {/* Row 2: Stats (desktop only) */}
+      {!mob && <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10 }}>
         {[
           { val:chantiers.length, label:"Chantiers total", icon:"🏗️", color:C.text,   sub:chantiers.length>0?"+"+chantiers.length+" total":"-" },
           { val:enCours,          label:"En cours",        icon:"⚡",  color:C.blue,   sub:enCours>0?"actif":"-" },
@@ -1269,7 +1295,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
             <div style={{ fontSize:10, color:s.sub.includes("+")&&s.sub!=="+0 ce mois-ci"?C.green:C.muted, marginTop:3, fontWeight:500 }}>{s.sub}</div>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Row 3: Chart + Comparaison + Récents */}
       <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"2fr 2fr 2fr", gap:14 }}>
@@ -2498,7 +2524,8 @@ function CalcGO() {
         </div>
 
         {/* liste unifiée ouvertures + poteaux */}
-        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+        <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:6, minWidth:380 }}>
           {/* en-têtes */}
           <div style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
             {["Type","Nom","L (m)","H (m)","Qté",""].map((h,i) => (
@@ -2560,6 +2587,7 @@ function CalcGO() {
               + Poteau
             </button>
           </div>
+        </div>
         </div>
 
         <button onClick={calcAgglo} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
@@ -2768,7 +2796,8 @@ function CalcBriques() {
         </div>
 
         {/* ouvertures + poteaux */}
-        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+        <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:6, minWidth:380 }}>
           <div style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
             {["Type","Nom","L (m)","H (m)","Qté",""].map((h,i) => (
               <span key={i} style={{ fontSize:10, fontWeight:700, color:C.muted, letterSpacing:".06em", textTransform:"uppercase", textAlign:i>=4?"center":"left" }}>{h}</span>
@@ -2824,6 +2853,7 @@ function CalcBriques() {
               + Poteau
             </button>
           </div>
+        </div>
         </div>
 
         <button onClick={calc} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
@@ -3763,22 +3793,27 @@ function SidebarContent({ tab, setTab, logout, userLabel, onClose, onEntreprise 
 function AppHeader({ mob, setSidebarOpen, notifCount }) {
   const [search, setSearch] = useState("");
   return (
-    <div style={{ height:56, background:"#fff", borderBottom:"1px solid rgba(0,0,0,.06)", display:"flex", alignItems:"center", padding:"0 20px", gap:12, flexShrink:0, zIndex:10 }}>
+    <div style={{ height:mob?52:56, background:"#fff", borderBottom:"1px solid rgba(0,0,0,.06)", display:"flex", alignItems:"center", padding:mob?"0 14px":"0 20px", gap:mob?8:12, flexShrink:0, zIndex:10 }}>
       {mob && (
-        <button onClick={() => setSidebarOpen(o => !o)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, display:"flex", flexDirection:"column", gap:4 }}>
+        <button onClick={() => setSidebarOpen(o => !o)} style={{ background:"none", border:"none", cursor:"pointer", padding:4, display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
           <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
           <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
           <span style={{ display:"block", width:20, height:2, background:C.text, borderRadius:2 }}/>
         </button>
       )}
-      <div style={{ flex:1, maxWidth:480, position:"relative", display:"flex", alignItems:"center" }}>
-        <span style={{ position:"absolute", left:11, color:C.muted, pointerEvents:"none", fontSize:14 }}>🔍</span>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Rechercher un chantier, un document..."
-          style={{ width:"100%", padding:"8px 12px 8px 34px", borderRadius:10, border:"1px solid rgba(0,0,0,.08)", fontSize:13, fontFamily:"inherit", outline:"none", background:"#f5f4f0", color:C.text }}/>
-      </div>
-      <div style={{ flex:1 }}/>
-      <div style={{ position:"relative" }}>
+      {mob
+        ? <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
+            <img src="https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png" style={{ height:22, width:"auto" }} alt="BATIR"/>
+          </div>
+        : <div style={{ flex:1, maxWidth:480, position:"relative", display:"flex", alignItems:"center" }}>
+            <span style={{ position:"absolute", left:11, color:C.muted, pointerEvents:"none", fontSize:14 }}>🔍</span>
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher un chantier, un document..."
+              style={{ width:"100%", padding:"8px 12px 8px 34px", borderRadius:10, border:"1px solid rgba(0,0,0,.08)", fontSize:13, fontFamily:"inherit", outline:"none", background:"#f5f4f0", color:C.text }}/>
+          </div>
+      }
+      {!mob && <div style={{ flex:1 }}/>}
+      <div style={{ position:"relative", flexShrink:0 }}>
         <button style={{ background:"none", border:"none", cursor:"pointer", fontSize:20, lineHeight:1, display:"flex" }}>🔔</button>
         {notifCount > 0 && <div style={{ position:"absolute", top:-3, right:-3, minWidth:16, height:16, background:C.red, borderRadius:99, fontSize:9, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, padding:"0 4px" }}>{notifCount}</div>}
       </div>
