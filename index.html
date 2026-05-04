@@ -1188,12 +1188,19 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
   };
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:mob?12:18, maxWidth:1300 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:mob?12:20, maxWidth:1300 }}>
 
       {/* Greeting */}
-      <div>
-        <div style={{ fontSize:mob?18:24, fontWeight:700, color:C.text, letterSpacing:"-.02em" }}>{salut}, {userLabel.split(" ")[0]} 👋</div>
-        {!mob && <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>Voici le résumé de votre activité aujourd'hui.</div>}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:8 }}>
+        <div>
+          <div style={{ fontSize:mob?20:26, fontWeight:700, color:C.text, letterSpacing:"-.02em" }}>{salut}, {userLabel.split(" ")[0]} 👋</div>
+          {!mob && <div style={{ color:C.muted, fontSize:13, marginTop:2 }}>
+            Voici le résumé de votre activité ce {new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}.
+          </div>}
+        </div>
+        {!mob && <button onClick={() => onNavigate("chantiers")} style={{ background:C.surface2, color:C.text, border:`1px solid ${C.border}`, borderRadius:99, padding:"9px 20px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:8, boxShadow:"0 1px 4px rgba(0,0,0,.06)" }}>
+          + Nouveau chantier
+        </button>}
       </div>
 
       {/* Mobile: résumé rapide + actions rapides */}
@@ -1222,131 +1229,109 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         </>
       )}
 
-      {/* Row 1: Score + Alertes + Prochaine action */}
-      <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr", gap:14 }}>
+      {/* Row 1 (desktop): Activité aujourd'hui + Actions rapides */}
+      {!mob && <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:14 }}>
 
         <div style={card()}>
-          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, letterSpacing:"-.01em" }}>Score global</div>
-          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            <DonutScore score={score} color={scoreColor}/>
-            <div>
-              <div style={{ fontSize:15, fontWeight:700, color:scoreColor }}>{scoreLabel}</div>
-              <div style={{ fontSize:12, color:C.muted, marginTop:4, lineHeight:1.5 }}>{scoreMsg}</div>
-              <button onClick={() => onNavigate("chantiers")} style={{ marginTop:8, background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:500, padding:0 }}>Voir le détail →</button>
-            </div>
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:18 }}>Votre activité aujourd'hui</div>
+          <div style={{ display:"flex", gap:12 }}>
+            {[
+              { icon:"🏗️", val:enCours,           label:"Chantier"+(enCours!==1?"s":"")+" actif"+(enCours!==1?"s":""), color:C.text },
+              { icon:"⚠️", val:alertes.length,     label:"Alerte"+(alertes.length!==1?"s":""),                         color:alertes.length>0?C.orange:C.muted },
+              { icon:"✅", val:todayRappels.length, label:"Action"+(todayRappels.length!==1?"s":"")+" aujourd'hui",    color:todayRappels.length>0?C.blue:C.muted },
+            ].map((s,i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:14, flex:1, padding:"16px 18px", background:C.surface2, borderRadius:16 }}>
+                <div style={{ fontSize:30 }}>{s.icon}</div>
+                <div>
+                  <div style={{ fontSize:30, fontWeight:700, color:s.color, letterSpacing:"-.03em", lineHeight:1 }}>{s.val}</div>
+                  <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>{s.label}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         <div style={card()}>
-          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, letterSpacing:"-.01em", display:"flex", alignItems:"center", gap:8 }}>
-            Alertes {alertes.length > 0 && <span style={{ background:C.red, color:"#fff", borderRadius:99, fontSize:10, fontWeight:700, padding:"2px 8px" }}>{alertes.length}</span>}
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:18 }}>Actions rapides</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            {[
+              { icon:"➕", label:"Nouveau chantier", action:() => onNavigate("chantiers") },
+              { icon:"📐", label:"Faire un calcul",  action:() => onNavigate("calculs") },
+              { icon:"📝", label:"Créer un PV",      action:() => onNavigate("cr") },
+              { icon:"📅", label:"Ajouter un RDV",   action:() => onNavigate("chantiers") },
+            ].map((a,i) => (
+              <button key={i} onClick={a.action} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", background:C.surface2, border:"1px solid transparent", borderRadius:12, cursor:"pointer", fontFamily:"inherit" }}
+                onMouseEnter={e => { e.currentTarget.style.background="#ede9e4"; e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform="translateY(-1px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background=C.surface2; e.currentTarget.style.borderColor="transparent"; e.currentTarget.style.transform="none"; }}>
+                <span style={{ fontSize:18 }}>{a.icon}</span>
+                <span style={{ fontSize:12, color:C.text, fontWeight:500 }}>{a.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>}
+
+      {/* Row 2 (desktop): KPI cards */}
+      {!mob && <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10 }}>
+        {[
+          { val:avgPct+"%",       label:"Avancement global", icon:"📈", color:C.blue,               sub:"Moy. "+chantiers.length+" chantier"+(chantiers.length!==1?"s":""), pct:avgPct },
+          { val:chantiers.length, label:"Total chantiers",   icon:"🏗️", color:C.text,               sub:enCours+" en cours",                                              pct:null },
+          { val:enCours,          label:"En cours",          icon:"⚡",  color:C.blue,               sub:enCours>0?"actif"+(enCours!==1?"s":""):"-",                       pct:chantiers.length?Math.round(enCours/chantiers.length*100):0 },
+          { val:termines,         label:"Terminés",          icon:"✅",  color:C.green,              sub:termines>0?termines+" chantier"+(termines!==1?"s":""):"Aucun terminé", pct:chantiers.length?Math.round(termines/chantiers.length*100):0 },
+          { val:bloques,          label:"Bloqués",           icon:"🔴",  color:bloques>0?C.red:C.muted, sub:bloques>0?"⚠️ action requise":"Aucun bloqué",                  pct:null },
+        ].map((s,i) => (
+          <div key={i} onClick={() => onNavigate("chantiers")} style={{ ...card({ cursor:"pointer", padding:"20px 22px" }) }}
+            onMouseEnter={e => e.currentTarget.style.transform="translateY(-3px)"}
+            onMouseLeave={e => e.currentTarget.style.transform="none"}>
+            <div style={{ width:40, height:40, borderRadius:12, background:s.color+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, marginBottom:14 }}>{s.icon}</div>
+            <div style={{ fontSize:28, fontWeight:700, color:s.color, letterSpacing:"-.03em", lineHeight:1 }}>{s.val}</div>
+            <div style={{ fontSize:12, color:C.text, fontWeight:600, marginTop:6 }}>{s.label}</div>
+            <div style={{ fontSize:11, color:C.muted, marginTop:3 }}>{s.sub}</div>
+            {s.pct !== null && <div style={{ height:3, background:"#f2f2f7", borderRadius:99, marginTop:12 }}>
+              <div style={{ height:3, width:`${s.pct}%`, background:s.color, borderRadius:99 }}/>
+            </div>}
+          </div>
+        ))}
+      </div>}
+
+      {/* Row 3: ALERTES + CHANTIERS RÉCENTS + PLANNING */}
+      <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr", gap:14 }}>
+
+        {/* ALERTES */}
+        <div style={card()}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase" }}>Alertes</div>
+            <button onClick={() => onNavigate("chantiers")} style={{ background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:500, padding:0 }}>Voir toutes →</button>
           </div>
           {alertes.length === 0
-            ? <div style={{ color:C.green, fontSize:13, fontWeight:500 }}>✅ Aucune alerte — tout va bien !</div>
+            ? <div style={{ display:"flex", gap:12, alignItems:"center", padding:"12px 14px", background:C.green+"10", borderRadius:12 }}>
+                <div style={{ width:36, height:36, borderRadius:10, background:C.green+"20", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>✅</div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:C.text }}>Tout va bien !</div>
+                  <div style={{ fontSize:11, color:C.muted }}>Aucune alerte pour le moment</div>
+                </div>
+              </div>
             : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {alertes.map((a,i) => (
-                  <div key={i} style={{ display:"flex", gap:10, alignItems:"flex-start", padding:"8px 10px", background:a.color+"10", borderRadius:10, border:`1px solid ${a.color}20` }}>
-                    <span style={{ fontSize:15, flexShrink:0 }}>{a.icon}</span>
-                    <div>
-                      <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{a.title}</div>
-                      <div style={{ fontSize:11, color:C.muted }}>{a.desc}</div>
-                      <button onClick={() => onNavigate("chantiers")} style={{ background:"none", border:"none", color:C.blue, fontSize:10, cursor:"pointer", fontFamily:"inherit", padding:0, marginTop:2 }}>Voir le chantier →</button>
+                  <div key={i} onClick={() => onNavigate("chantiers")} style={{ display:"flex", gap:12, alignItems:"center", padding:"12px 14px", background:"#fff", border:`1px solid ${C.border}`, borderRadius:14, cursor:"pointer" }}
+                    onMouseEnter={e => { e.currentTarget.style.background=C.surface2; e.currentTarget.style.borderColor=a.color+"50"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background="#fff"; e.currentTarget.style.borderColor=C.border; }}>
+                    <div style={{ width:38, height:38, borderRadius:10, background:a.color+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>{a.icon}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{a.title}</div>
+                      <div style={{ fontSize:11, color:C.muted, marginTop:1 }}>{a.desc}</div>
                     </div>
+                    <div style={{ color:C.muted, fontSize:20, flexShrink:0 }}>›</div>
                   </div>
                 ))}
               </div>
           }
         </div>
 
-        <div style={card({ background:"linear-gradient(135deg,#f5f0ff 0%,#fff 70%)" })}>
-          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, letterSpacing:"-.01em" }}>Prochaine action recommandée</div>
-          {prochaineAction
-            ? <div>
-                <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-                  <div style={{ width:40, height:40, borderRadius:10, background:C.blue+"15", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>🎯</div>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:C.text, lineHeight:1.4 }}>{prochaineAction.texte}</div>
-                    <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{prochaineAction.chantierNom}</div>
-                    {prochaineAction.date && <div style={{ fontSize:11, color:C.orange, marginTop:2, fontWeight:500 }}>{new Date(prochaineAction.date+"T12:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})}</div>}
-                  </div>
-                </div>
-                <button onClick={() => onNavigate("chantiers")} style={{ marginTop:12, background:C.blue, color:"#fff", border:"none", borderRadius:8, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Ouvrir →</button>
-              </div>
-            : <div style={{ color:C.muted, fontSize:13 }}>Aucune action urgente. Beau travail ! 🎉</div>
-          }
-        </div>
-      </div>
-
-      {/* Row 2: Stats (desktop only) */}
-      {!mob && <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:10 }}>
-        {[
-          { val:chantiers.length, label:"Chantiers total", icon:"🏗️", color:C.text,   sub:chantiers.length>0?"+"+chantiers.length+" total":"-" },
-          { val:enCours,          label:"En cours",        icon:"⚡",  color:C.blue,   sub:enCours>0?"actif":"-" },
-          { val:enAttente,        label:"En attente",      icon:"⏳",  color:C.orange, sub:enAttente>0?"+"+enAttente+" ce mois-ci":"-" },
-          { val:termines,         label:"Terminés",        icon:"✅",  color:C.green,  sub:"+0 ce mois-ci" },
-          { val:bloques,          label:"Bloqués",         icon:"🔴",  color:C.red,    sub:bloques>0?"⚠️ action requise":"-" },
-        ].map((s,i) => (
-          <div key={i} onClick={() => onNavigate("chantiers")} style={{ ...card({ cursor:"pointer", padding:"18px 20px" }) }}
-            onMouseEnter={e => e.currentTarget.style.transform="translateY(-3px)"}
-            onMouseLeave={e => e.currentTarget.style.transform="none"}>
-            <div style={{ width:40, height:40, borderRadius:12, background:s.color+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, marginBottom:12 }}>{s.icon}</div>
-            <div style={{ fontSize:26, fontWeight:700, color:s.color, letterSpacing:"-.03em" }}>{s.val}</div>
-            <div style={{ fontSize:12, color:C.text, fontWeight:600, marginTop:3 }}>{s.label}</div>
-            <div style={{ fontSize:10, color:s.sub.includes("+")&&s.sub!=="+0 ce mois-ci"?C.green:C.muted, marginTop:3, fontWeight:500 }}>{s.sub}</div>
-          </div>
-        ))}
-      </div>}
-
-      {/* Row 3: Chart + Comparaison + Récents */}
-      <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"2fr 2fr 2fr", gap:14 }}>
-
+        {/* CHANTIERS RÉCENTS */}
         <div style={card()}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2 }}>
-            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Avancement global</span>
-            <span style={{ fontWeight:700, fontSize:18, color:C.blue }}>{avgPct}%</span>
-          </div>
-          <div style={{ fontSize:11, color:C.green, marginBottom:10, fontWeight:500 }}>↑ Progression en cours</div>
-          <LineChart data={chartData}/>
-          <div style={{ fontSize:11, color:C.muted, marginTop:8 }}>Moyenne sur {chantiers.length} chantier{chantiers.length>1?"s":""}</div>
-        </div>
-
-        <div style={card()}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:14, letterSpacing:"-.01em", color:C.text }}>Comparaison des chantiers</div>
-          {chantiers.length === 0
-            ? <div style={{ color:C.muted, fontSize:13, textAlign:"center", padding:"20px 0" }}>Aucun chantier</div>
-            : <>
-                <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:4, marginBottom:8, paddingBottom:6, borderBottom:`1px solid ${C.border}` }}>
-                  {["Chantier","Avanc.","Retard"].map(h => <div key={h} style={{ fontSize:10, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:".04em" }}>{h}</div>)}
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {chantiers.slice(0,4).map(c => {
-                    const pct = phases.find(p=>p.label===c.phase)?.pct||0;
-                    const retard = (c.rappels||[]).filter(r => !r.regle && r.date && r.date < today).length;
-                    return (
-                      <div key={c.id} style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:4, alignItems:"center", padding:"5px 0", borderBottom:`1px solid ${C.border}` }}>
-                        <div>
-                          <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{c.client||c.nom}</div>
-                          <div style={{ fontSize:10, color:C.muted }}>{c.commune||c.phase}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize:11, fontWeight:600, color:C.blue, marginBottom:3 }}>{pct}%</div>
-                          <div style={{ height:3, background:"#f2f2f7", borderRadius:99 }}>
-                            <div style={{ height:3, width:`${pct}%`, background:C.blue, borderRadius:99 }}/>
-                          </div>
-                        </div>
-                        <div style={{ fontSize:11, fontWeight:600, color:retard>0?C.red:C.green }}>{retard>0?`+${retard}j`:"OK"}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button onClick={() => onNavigate("chantiers")} style={{ marginTop:10, background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", padding:0, fontWeight:500 }}>Voir tous les chantiers →</button>
-              </>
-          }
-        </div>
-
-        <div style={card()}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Chantiers récents</span>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase" }}>Chantiers récents</div>
             <button onClick={() => onNavigate("chantiers")} style={{ background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:500, padding:0 }}>Voir tout →</button>
           </div>
           {chantiers.length === 0
@@ -1354,125 +1339,135 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
                 Aucun chantier<br/>
                 <button onClick={() => onNavigate("chantiers")} style={{ background:C.blue, color:"#fff", border:"none", borderRadius:8, padding:"7px 14px", marginTop:10, fontSize:12, cursor:"pointer", fontWeight:600, fontFamily:"inherit" }}>+ Créer</button>
               </div>
-            : <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {chantiers.slice(0,3).map(c => {
+            : <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {chantiers.slice(0,2).map(c => {
                   const pct = phases.find(p=>p.label===c.phase)?.pct||0;
                   const col = STATUS_COLORS[c.statut]||C.muted;
                   const initials = (c.client||c.nom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+                  const nextAction = (c.rappels||[]).find(r => !r.regle && r.date >= today);
                   return (
-                    <div key={c.id} onClick={() => onNavigate("chantiers")} style={{ cursor:"pointer", padding:"10px 12px", background:C.surface2, borderRadius:12 }}
+                    <div key={c.id} onClick={() => onNavigate("chantiers")} style={{ cursor:"pointer", padding:"14px", background:C.surface2, borderRadius:14, border:`1px solid ${C.border}` }}
                       onMouseEnter={e => e.currentTarget.style.background="#ede9e4"}
                       onMouseLeave={e => e.currentTarget.style.background=C.surface2}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-                        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                          <div style={{ width:34, height:34, borderRadius:10, background:col+"20", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:col, flexShrink:0 }}>{initials}</div>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{c.client||c.nom}</div>
-                            <div style={{ fontSize:10, color:C.muted }}>{c.commune||""} · {c.phase||""}</div>
+                      <div style={{ display:"flex", gap:12, marginBottom:10 }}>
+                        <div style={{ width:60, height:60, borderRadius:12, background:col+"20", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, fontWeight:700, color:col, flexShrink:0 }}>{initials}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6 }}>
+                            <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{c.client||c.nom}</div>
+                            <span style={{ fontSize:10, fontWeight:600, color:col, background:col+"18", borderRadius:99, padding:"3px 9px", whiteSpace:"nowrap", flexShrink:0 }}>{c.statut}</span>
                           </div>
+                          <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{[c.commune,c.phase].filter(Boolean).join(" · ")}</div>
                         </div>
-                        <span style={{ fontSize:10, fontWeight:600, color:col, background:col+"15", borderRadius:99, padding:"2px 7px", whiteSpace:"nowrap" }}>{c.statut}</span>
                       </div>
-                      <div style={{ height:3, background:"#e5e5ea", borderRadius:99 }}>
-                        <div style={{ height:3, width:`${pct}%`, background:col, borderRadius:99 }}/>
+                      <div style={{ fontSize:10, color:C.muted, fontWeight:500, marginBottom:5 }}>Avancement</div>
+                      <div style={{ height:4, background:"#e5e5ea", borderRadius:99, marginBottom:6 }}>
+                        <div style={{ height:4, width:`${pct}%`, background:col, borderRadius:99 }}/>
                       </div>
-                      <div style={{ textAlign:"right", fontSize:10, color:col, fontWeight:600, marginTop:3 }}>{pct}%</div>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div style={{ fontSize:11, color:C.muted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1 }}>
+                          {nextAction ? <><strong style={{ color:C.text }}>Prochaine action</strong> · {nextAction.texte}</> : "Aucune action planifiée"}
+                        </div>
+                        <div style={{ fontSize:12, fontWeight:700, color:col, marginLeft:8, flexShrink:0 }}>{pct}%</div>
+                      </div>
                     </div>
                   );
                 })}
               </div>
           }
         </div>
-      </div>
 
-      {/* Row 4: Aujourd'hui + Actions rapides + Planning semaine */}
-      <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr", gap:14 }}>
-
+        {/* PLANNING DE LA SEMAINE */}
         <div style={card()}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Aujourd'hui</span>
-            {todayRappels.length > 0 && <span style={{ background:C.blue+"18", color:C.blue, borderRadius:99, fontSize:10, fontWeight:700, padding:"2px 8px" }}>{todayRappels.length}</span>}
-          </div>
-          {(todayRappels.length === 0 && rappelsBientot.length === 0)
-            ? <div style={{ color:C.muted, fontSize:13, textAlign:"center", padding:"16px 0" }}>Aucun événement prévu 🎉</div>
-            : <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
-                {(todayRappels.length > 0 ? todayRappels : rappelsBientot).slice(0,4).map(r => {
-                  const initials = (r.chantierNom||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-                  return (
-                    <div key={r.id} style={{ display:"flex", gap:10, alignItems:"center", padding:"7px 10px", background:C.surface2, borderRadius:10 }}>
-                      <div style={{ fontSize:11, color:C.muted, fontWeight:500, minWidth:34, textAlign:"center" }}>
-                        {r.heure || (r.date===today?"Auj.":new Date(r.date+"T12:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"}))}
-                      </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.texte}</div>
-                        <div style={{ fontSize:10, color:C.muted }}>{r.chantierNom}</div>
-                      </div>
-                      <div style={{ width:26, height:26, borderRadius:"50%", background:C.blue, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, flexShrink:0 }}>{initials}</div>
-                    </div>
-                  );
-                })}
-                {(todayRappels.length+rappelsBientot.length) > 4 && <button onClick={() => onNavigate("chantiers")} style={{ background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", padding:0, fontWeight:500 }}>Voir tous les événements →</button>}
-              </div>
-          }
-        </div>
-
-        <div style={card()}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:14, letterSpacing:"-.01em", color:C.text }}>Actions rapides</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            {[
-              { icon:"➕", label:"Nouveau chantier", action:() => onNavigate("chantiers") },
-              { icon:"📝", label:"Créer un PV",      action:() => onNavigate("cr") },
-              { icon:"📐", label:"Faire un calcul",  action:() => onNavigate("calculs") },
-              { icon:"📅", label:"Ajouter un RDV",   action:() => onNavigate("chantiers") },
-              { icon:"📁", label:"Importer un doc",  action:() => onNavigate("documents") },
-              { icon:"📋", label:"Nouveau CR",       action:() => onNavigate("cr") },
-              { icon:"📊", label:"Rapport",          action:() => onNavigate("rapports") },
-              { icon:"👥", label:"Équipe",           action:() => onNavigate("equipe") },
-            ].map((a,i) => (
-              <button key={i} onClick={a.action} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8, padding:"14px 8px", background:C.surface2, border:"1px solid transparent", borderRadius:14, cursor:"pointer", fontFamily:"inherit" }}
-                onMouseEnter={e => { e.currentTarget.style.background="#ede9e4"; e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform="translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background=C.surface2; e.currentTarget.style.borderColor="transparent"; e.currentTarget.style.transform="none"; }}>
-                <div style={{ width:40, height:40, borderRadius:12, background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 1px 4px rgba(0,0,0,.08)" }}>{a.icon}</div>
-                <span style={{ fontSize:10, color:C.text, fontWeight:600, textAlign:"center", lineHeight:1.3 }}>{a.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={card()}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Planning de la semaine</span>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase" }}>Planning de la semaine</div>
             <button onClick={() => onNavigate("planning")} style={{ background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:500, padding:0 }}>Voir planning →</button>
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:12 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4, marginBottom:16 }}>
             {weekDays.map((d,i) => (
               <div key={i} style={{ textAlign:"center" }}>
-                <div style={{ fontSize:9, color:C.muted, fontWeight:500, marginBottom:4 }}>{d.name}</div>
-                <div style={{ width:26, height:26, borderRadius:"50%", background:d.isToday?C.blue:"transparent", color:d.isToday?"#fff":C.text, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:d.isToday?700:400, margin:"0 auto" }}>{d.num}</div>
-                {d.events.length > 0 && <div style={{ width:4, height:4, borderRadius:"50%", background:C.blue, margin:"3px auto 0" }}/>}
+                <div style={{ fontSize:9, color:d.isToday?C.blue:C.muted, fontWeight:600, marginBottom:4, textTransform:"uppercase", letterSpacing:".04em" }}>{d.name}</div>
+                <div style={{ width:28, height:28, borderRadius:8, background:d.isToday?C.blue:"transparent", color:d.isToday?"#fff":C.text, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:d.isToday?700:400, margin:"0 auto" }}>{d.num}</div>
+                {d.events.length>0 && <div style={{ width:4, height:4, borderRadius:"50%", background:d.isToday?C.blue:C.muted, margin:"4px auto 0" }}/>}
               </div>
             ))}
           </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-            {weekDays.filter(d => d.events.length>0).flatMap(d => d.events.slice(0,1).map(ev => ({ ...ev, dayName:d.name, num:d.num, isToday:d.isToday }))).slice(0,4).map((ev,i) => (
-              <div key={i} style={{ display:"flex", gap:8, alignItems:"center", padding:"4px 0", borderTop:i>0?`1px solid ${C.border}`:"none" }}>
-                <div style={{ width:6, height:6, borderRadius:"50%", background:STATUS_COLORS[ev.type]||C.blue, flexShrink:0 }}/>
-                <div style={{ fontSize:11, color:C.muted, minWidth:30 }}>{ev.isToday?"Auj.":ev.dayName+" "+ev.num}</div>
-                <div style={{ flex:1, fontSize:11, fontWeight:500, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{ev.texte}</div>
-                <div style={{ fontSize:10, color:C.muted, maxWidth:70, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flexShrink:0 }}>{ev.chantierNom}</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {weekDays.filter(d=>d.events.length>0).flatMap(d=>d.events.slice(0,2).map(ev=>({ ...ev, dayName:d.name, num:d.num, isToday:d.isToday }))).slice(0,4).map((ev,idx) => (
+              <div key={idx} style={{ display:"flex", gap:10, alignItems:"flex-start", padding:"8px 10px", background:C.surface2, borderRadius:10 }}>
+                <div style={{ width:8, height:8, borderRadius:"50%", background:STATUS_COLORS[ev.type]||C.blue, flexShrink:0, marginTop:3 }}/>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{ev.texte}</div>
+                  <div style={{ fontSize:10, color:C.muted, marginTop:1 }}>{ev.chantierNom}</div>
+                </div>
+                <div style={{ fontSize:10, color:C.muted, flexShrink:0 }}>{ev.isToday?"Auj.":ev.dayName+" "+ev.num}</div>
               </div>
             ))}
-            {weekDays.every(d => d.events.length===0) && <div style={{ color:C.muted, fontSize:12, textAlign:"center", padding:"8px 0" }}>Aucun événement cette semaine</div>}
+            {weekDays.every(d=>d.events.length===0) && <div style={{ color:C.muted, fontSize:12, textAlign:"center", padding:"12px 0" }}>Aucun événement cette semaine</div>}
+            <button onClick={() => onNavigate("planning")} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6, background:"none", border:`1.5px dashed ${C.border}`, borderRadius:10, padding:"8px", cursor:"pointer", fontFamily:"inherit", color:C.muted, fontSize:12 }}>
+              + Ajouter un événement
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Astuce */}
-      <div style={{ background:"#fff8f0", border:"1px solid rgba(255,149,0,.2)", borderRadius:12, padding:"10px 18px", display:"flex", alignItems:"center", gap:12 }}>
-        <span style={{ fontSize:16, flexShrink:0 }}>♦</span>
-        <span style={{ fontSize:12, color:C.muted, flex:1 }}><strong style={{ color:C.text }}>Astuce</strong> — Activez les notifications par email pour ne rien manquer sur vos chantiers.</span>
-        <button style={{ background:"none", border:"none", color:C.blue, fontSize:12, cursor:"pointer", fontFamily:"inherit", fontWeight:500, whiteSpace:"nowrap", flexShrink:0 }}>Activer maintenant →</button>
-      </div>
+      {/* Row 4 (desktop): Évolution + Résumé automatique + Action recommandée */}
+      {!mob && <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:14 }}>
+
+        <div style={card()}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase" }}>Évolution des chantiers</div>
+            <span style={{ fontSize:12, color:C.muted, background:C.surface2, borderRadius:8, padding:"4px 10px" }}>30 derniers jours</span>
+          </div>
+          <LineChart data={chartData}/>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:12 }}>
+            <div style={{ width:20, height:2, background:C.blue, borderRadius:99 }}/>
+            <div style={{ fontSize:11, color:C.muted }}>Moyenne de vos chantiers</div>
+          </div>
+        </div>
+
+        <div style={card()}>
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:18 }}>✦ Résumé automatique</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {alertes.length > 0 && <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:C.red+"15", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>⚠️</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:600, color:C.text }}>{alertes.length} chantier{alertes.length>1?"s":""} en retard</div>
+                <div style={{ fontSize:11, color:C.muted }}>{alertes[0]?.desc||""}</div>
+              </div>
+            </div>}
+            {prochaineAction && <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:C.orange+"15", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>📦</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:600, color:C.text }}>1 action urgente</div>
+                <div style={{ fontSize:11, color:C.muted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:140 }}>{prochaineAction.texte}</div>
+              </div>
+            </div>}
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:C.green+"15", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>✅</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Progression globale</div>
+                <div style={{ fontSize:11, color:C.muted }}>+{avgPct}% d'avancement moyen</div>
+              </div>
+            </div>
+            {alertes.length === 0 && !prochaineAction && <div style={{ color:C.green, fontSize:12, fontWeight:500, marginTop:4 }}>✅ Tout va bien — aucune alerte !</div>}
+          </div>
+        </div>
+
+        <div style={card({ background:"#f5f4f0", border:"none" })}>
+          <div style={{ fontSize:10, fontWeight:700, color:C.blue, letterSpacing:".08em", textTransform:"uppercase", marginBottom:16 }}>Action recommandée</div>
+          {prochaineAction
+            ? <>
+                <div style={{ width:44, height:44, borderRadius:14, background:C.blue+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, marginBottom:14 }}>🎯</div>
+                <div style={{ fontSize:15, fontWeight:700, color:C.text, lineHeight:1.4, marginBottom:6 }}>{prochaineAction.texte}</div>
+                <div style={{ fontSize:12, color:C.muted, marginBottom:20 }}>{prochaineAction.chantierNom}</div>
+                <button onClick={() => onNavigate("chantiers")} style={{ background:C.text, color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                  Ouvrir →
+                </button>
+              </>
+            : <div style={{ color:C.muted, fontSize:13, lineHeight:1.6 }}>Aucune action urgente détectée.<br/>Beau travail ! 🎉</div>
+          }
+        </div>
+      </div>}
 
     </div>
   );
