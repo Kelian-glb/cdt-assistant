@@ -297,6 +297,19 @@ const STATUS_ICONS = {
 
 const AVANCEMENT = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
+const LOTS_PV = [
+  { num: 1,  label: "Terrassement et VRD" },
+  { num: 2,  label: "Gros œuvre" },
+  { num: 3,  label: "Maçonnerie légère – Cloisonnement" },
+  { num: 4,  label: "Etanchéité – Couverture" },
+  { num: 5,  label: "Menuiseries extérieures et intérieures" },
+  { num: 6,  label: "Plomberie – Sanitaire" },
+  { num: 7,  label: "Electricité" },
+  { num: 8,  label: "Plâtrerie – Faux plafond" },
+  { num: 9,  label: "Peinture – Revêtement mural" },
+  { num: 10, label: "Carrelage" },
+];
+
 // ── localStorage hook ──────────────────────────────────────────────────────
 function useLocalStorage(key, defaultValue) {
   const [value, setValue] = useState(() => {
@@ -331,8 +344,8 @@ function useSupaChantiers(userId) {
   };
 
   const update = async (updated) => {
-    const { nom, client, commune, statut, phase, notes, checks, rappels } = updated;
-    await supabase.from("chantiers").update({ nom, client, commune, statut, phase, notes, checks, rappels, updated_at: new Date().toISOString() }).eq("id", updated.id);
+    const { nom, client, commune, statut, phase, notes, checks, rappels, documents, budget, prochaine_action } = updated;
+    await supabase.from("chantiers").update({ nom, client, commune, statut, phase, notes, checks, rappels, documents, budget, prochaine_action, updated_at: new Date().toISOString() }).eq("id", updated.id);
     setChantiers(prev => (prev||[]).map(c => c.id === updated.id ? updated : c));
   };
 
@@ -591,36 +604,187 @@ ${cr.prochainRdv?`<h2>Prochain RDV</h2><div style="background:#f2f2f7;border-rad
   `, `CR – ${cr.chantier||"Réunion"}`);
 }
 
-function exportPVPDF(pv, entreprise) {
-  openPDF(`
-${buildEnteteHTML(entreprise)}
-<h1 style="font-size:18px">Procès-verbal de réception de travaux</h1>
-<div style="color:#6d6d72;font-size:13px;margin:6px 0 20px">${pv.chantier||""} · ${pv.date?new Date(pv.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):""}</div>
-<h2>Parties présentes</h2>
-<div class="meta">
-  <div class="meta-item"><div class="meta-label">Conducteur de travaux</div><div class="meta-value">${pv.conducteur||""}</div></div>
-  <div class="meta-item"><div class="meta-label">Artisan / Entreprise</div><div class="meta-value">${pv.artisan||""}</div></div>
-  <div class="meta-item"><div class="meta-label">Corps de métier</div><div class="meta-value">${pv.corps||""}</div></div>
-  <div class="meta-item"><div class="meta-label">Date de réception</div><div class="meta-value">${pv.date?new Date(pv.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):""}</div></div>
+function exportPVPDF(pv, entreprise, sigMOE, sigST) {
+  const dateStr = pv.date ? new Date(pv.date+"T12:00").toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}) : "—";
+  const logoUrl = "https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png";
+  const chk = (val) => val ? "☑" : "☐";
+  const statutSans = pv.statut === "sans_reserve";
+  const statutAvec = pv.statut === "avec_reserve";
+  const statutNon  = pv.statut === "non_reception";
+
+  const lotsHtml = LOTS_PV.map(l =>
+    `<tr><td style="width:36px;text-align:center;border:1px solid #333;padding:4px 6px">${l.num}</td><td style="border:1px solid #333;padding:4px 8px">${l.label}</td></tr>`
+  ).join("");
+
+  const w = window.open("", "_blank");
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>PV – ${pv.sousTraitant||pv.chantier||"Réception"}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;background:#fff;font-size:12px;padding:28px 32px}
+  .page-break{page-break-before:always}
+  h1{font-size:15px;font-weight:700;text-align:center;letter-spacing:.06em;text-transform:uppercase;border:2px solid #000;padding:8px 16px;display:inline-block;margin-bottom:16px}
+  .header-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+  .company{font-size:11px;line-height:1.5;color:#333}
+  .company strong{font-size:12px;color:#000}
+  .field-row{display:grid;gap:8px;margin-bottom:8px}
+  .field{display:flex;align-items:baseline;gap:6px}
+  .field-label{font-weight:600;font-size:11px;white-space:nowrap;min-width:120px}
+  .field-value{border-bottom:1px solid #555;flex:1;font-size:12px;padding:1px 4px;min-height:18px}
+  .checkbox-row{display:flex;gap:20px;margin:10px 0;font-size:13px}
+  .checkbox-item{display:flex;align-items:center;gap:6px;font-size:12px}
+  .section-title{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px;border-bottom:1.5px solid #000;padding-bottom:3px}
+  .travaux-box{border:1px solid #888;border-radius:2px;padding:8px;min-height:64px;font-size:12px;line-height:1.6;white-space:pre-wrap}
+  .sig-area{border:1px solid #888;border-radius:2px;height:90px;display:flex;align-items:flex-end;justify-content:center;padding:6px}
+  .lots-table{width:100%;border-collapse:collapse;margin-top:12px}
+  .lots-table td{border:1px solid #333;padding:5px 8px;font-size:12px}
+  @media print{body{padding:16px 20px}.page-break{page-break-before:always}}
+</style></head><body>
+
+<!-- PAGE 1 -->
+<div style="text-align:center;margin-bottom:8px">
+  <img src="${logoUrl}" style="height:56px;object-fit:contain" onerror="this.style.display='none'"/>
 </div>
-<h2>Travaux réceptionnés</h2>
-<div style="background:#f2f2f7;border-radius:8px;padding:12px;line-height:1.7">${pv.travaux||"—"}</div>
-<h2>Réserves émises</h2>
-${pv.reserves&&pv.reserves.length>0?`<table><thead><tr><th>N°</th><th>Description</th><th>Délai de levée</th></tr></thead><tbody>${pv.reserves.map((r,i)=>`<tr><td>${i+1}</td><td>${r.desc}</td><td>${r.delai||"—"}</td></tr>`).join("")}</tbody></table>`
-  :`<div style="background:#f0fdf4;border-radius:8px;padding:10px 12px;color:#1a7a33;font-weight:600">✅ Aucune réserve — Travaux acceptés sans réserve</div>`}
-${pv.observations?`<h2>Observations</h2><div style="background:#f2f2f7;border-radius:8px;padding:12px;line-height:1.6">${pv.observations}</div>`:""}
-<h2>Décision</h2>
-<div style="background:${pv.decision==="Accepté sans réserve"?"#f0fdf4":pv.decision==="Refusé"?"#fff5f5":"#fffbeb"};border-radius:8px;padding:12px;font-weight:700;font-size:15px;color:${pv.decision==="Accepté sans réserve"?"#1a7a33":pv.decision==="Refusé"?"#c0392b":"#92400e"}">
-  ${pv.decision==="Accepté sans réserve"?"✅":pv.decision==="Refusé"?"❌":"⚠️"} ${pv.decision||"—"}</div>
-<h2>Signatures</h2>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px">
-  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Conducteur de travaux</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${pv.conducteur||""}</div><div class="sig-box">Signature</div></div>
-  <div><div style="font-size:12px;font-weight:600;color:#6d6d72;margin-bottom:6px">Artisan / Entreprise</div><div style="font-size:13px;font-weight:600;margin-bottom:4px">${pv.artisan||""}</div><div class="sig-box">Signature</div></div>
+<div style="text-align:center;margin-bottom:16px">
+  <h1>Procès Verbal de Réception par Lot</h1>
+  <div class="company">
+    <strong>SAS NEO SUD CONSTRUCTION</strong><br/>
+    168 allée de l'Amérique Latine – 30900 Nîmes
+  </div>
 </div>
-<div class="footer"><span>${entreprise?.nom||"Bâtir"} — PV établi par ${pv.conducteur||""}</span><span>${pv.chantier||""} · ${new Date().toLocaleDateString("fr-FR")}</span></div>
-  `, `PV – ${pv.artisan||pv.chantier||"Réception"}`);
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+  <div class="field"><span class="field-label">Date :</span><span class="field-value">${dateStr}</span></div>
+  <div class="field"><span class="field-label">Maître d'œuvre :</span><span class="field-value">${pv.maitroeuvre||"NEO SUD"}</span></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline;margin-bottom:10px">
+  <div class="field"><span class="field-label">Maître d'ouvrage :</span><span class="field-value">${pv.maitreOuvrage||""}</span></div>
+  <div class="checkbox-item" style="gap:10px;white-space:nowrap">
+    <span>Présent :</span>
+    <span>${chk(pv.maitreOuvragePresent)} OUI</span>
+    <span>${chk(!pv.maitreOuvragePresent)} NON</span>
+  </div>
+</div>
+
+<div class="field" style="margin-bottom:10px"><span class="field-label">Adresse chantier :</span><span class="field-value">${pv.adresseChantier||""}</span></div>
+<div class="field" style="margin-bottom:10px"><span class="field-label">Sous-traitant :</span><span class="field-value">${pv.sousTraitant||""}</span></div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+  <div class="field"><span class="field-label">Lot n° :</span><span class="field-value">${pv.lot||""}</span></div>
+  <div class="field"><span class="field-label">Poste :</span><span class="field-value">${pv.poste||""}</span></div>
+  <div class="field"><span class="field-label">Entreprise :</span><span class="field-value">${pv.sousTraitant||""}</span></div>
+</div>
+
+<div class="section-title">Décision de réception</div>
+<div class="checkbox-row">
+  <div class="checkbox-item">${chk(statutSans)} <span>Réception sans réserve</span></div>
+  <div class="checkbox-item">${chk(statutAvec)} <span>Réception avec réserve(s)</span></div>
+  <div class="checkbox-item">${chk(statutNon)} <span>Non réception</span></div>
+</div>
+
+<div class="section-title">Travaux restant à faire</div>
+<div class="travaux-box">${(pv.travauxRestants||"").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
+
+<div class="section-title">Travaux à reprendre</div>
+<div class="travaux-box">${(pv.travauxAReprendre||"").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px">
+  <div>
+    <div style="font-size:11px;font-weight:600;margin-bottom:4px;text-align:center">Signature maître d'œuvre</div>
+    ${sigMOE ? `<div style="border:1px solid #888;border-radius:2px;display:flex;align-items:center;justify-content:center;height:90px"><img src="${sigMOE}" style="max-height:82px;max-width:100%;object-fit:contain"/></div>` : `<div class="sig-area"></div>`}
+  </div>
+  <div>
+    <div style="font-size:11px;font-weight:600;margin-bottom:4px;text-align:center">Signature Sous-traitant</div>
+    ${sigST ? `<div style="border:1px solid #888;border-radius:2px;display:flex;align-items:center;justify-content:center;height:90px"><img src="${sigST}" style="max-height:82px;max-width:100%;object-fit:contain"/></div>` : `<div class="sig-area"></div>`}
+  </div>
+</div>
+
+<!-- PAGE 2 -->
+<div class="page-break" style="padding-top:28px">
+  <div style="text-align:center;margin-bottom:12px">
+    <img src="${logoUrl}" style="height:48px;object-fit:contain" onerror="this.style.display='none'"/>
+  </div>
+  <div style="text-align:center;margin-bottom:20px">
+    <h1>Liste des Lots</h1>
+    <div class="company"><strong>SAS NEO SUD CONSTRUCTION</strong></div>
+  </div>
+  <table class="lots-table">
+    <thead><tr><td style="border:1px solid #333;padding:4px 8px;font-weight:700;text-align:center">Lot</td><td style="border:1px solid #333;padding:4px 8px;font-weight:700">Désignation</td></tr></thead>
+    <tbody>${lotsHtml}</tbody>
+  </table>
+</div>
+
+</body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 600);
 }
 
+function SignaturePad({ label, sigRef }) {
+  const canvasRef = React.useRef(null);
+  const drawing = React.useRef(false);
+  const lastPos = React.useRef(null);
+
+  const getPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * (canvas.width / rect.width), y: (src.clientY - rect.top) * (canvas.height / rect.height) };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    drawing.current = true;
+    const canvas = canvasRef.current;
+    lastPos.current = getPos(e, canvas);
+  };
+
+  const draw = (e) => {
+    e.preventDefault();
+    if (!drawing.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pos = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#1c1c1e";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    lastPos.current = pos;
+  };
+
+  const stopDraw = () => { drawing.current = false; };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  React.useImperativeHandle(sigRef, () => ({
+    getDataURL: () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const hasContent = Array.from(px).some((v, i) => i % 4 === 3 && v > 0);
+      return hasContent ? canvas.toDataURL("image/png") : null;
+    },
+  }));
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span style={{ fontSize:11, fontWeight:600, color:C.muted }}>{label}</span>
+        <button onClick={clear} style={{ fontSize:10, color:C.muted, background:"transparent", border:"none", cursor:"pointer", padding:"2px 6px", fontFamily:"inherit" }}>Effacer</button>
+      </div>
+      <canvas ref={canvasRef} width={320} height={110}
+        style={{ border:`1.5px solid ${C.border}`, borderRadius:8, background:"#fff", touchAction:"none", cursor:"crosshair", width:"100%", height:110 }}
+        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+        onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+      />
+    </div>
+  );
+}
 function Badge({ status, size="sm" }) {
   const col = STATUS_COLORS[status] || C.muted;
   const icon = STATUS_ICONS[status] || "⚪";
@@ -2232,11 +2396,12 @@ function RappelsPanel({ chantier, onUpdate, phases }) {
 }
 
 
-function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
+function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise }) {
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
   const { crs, saveCR, delCR } = supaCR;
-  const { chantiers } = supaChantiers;
+  const { pvs, savePV } = supaPV || {};
+  const { chantiers, update: updateChantier } = supaChantiers;
   const { entreprise, save: saveEntreprise } = supaEntreprise;
 
   const [view, setView] = useState("form"); // "form" | "historique" | "pv" | "entreprise"
@@ -2254,10 +2419,14 @@ function TabCR({ userId, supaCR, supaChantiers, supaEntreprise }) {
 
   // ── PV state ──
   const [pv, setPv] = useState({
-    chantier:"", artisan:"", metier:"", date:today, conducteur:"",
-    travaux:"", reserves:"", observations:"", dateLeveReserves:"",
+    chantier:"", chantierId:null, date:today,
+    maitreOuvrage:"", maitreOuvragePresent:true, adresseChantier:"",
+    maitroeuvre:"NEO SUD", sousTraitant:"", lot:"", poste:"",
+    statut:"sans_reserve", travauxRestants:"", travauxAReprendre:"",
   });
-  const [pvOutput, setPvOutput] = useState("");
+  const [pvSaving, setPvSaving] = useState(false);
+  const sigMOERef = React.useRef();
+  const sigSTRef  = React.useRef();
 
   // ── Entreprise state ──
   const [ent, setEnt] = useState({ nom:"", adresse:"", telephone:"", email:"", logo_url:"" });
@@ -2322,34 +2491,23 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
     setSaving(false); setSaved(true);
   };
 
-  // ── Génération PV ──
-  const generatePV = () => {
-    const d = new Date(pv.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
-    setPvOutput(`PROCÈS-VERBAL DE RÉCEPTION DES TRAVAUX
-════════════════════════════════════════
-Chantier     : ${pv.chantier}
-Artisan      : ${pv.artisan}
-Métier       : ${pv.metier}
-Date         : ${d}
-Conducteur   : ${pv.conducteur}
-
-TRAVAUX RÉALISÉS
-────────────────────────────────────────
-${pv.travaux}
-
-RÉSERVES
-────────────────────────────────────────
-${pv.reserves || "Aucune réserve — travaux acceptés sans réserve"}
-
-OBSERVATIONS
-────────────────────────────────────────
-${pv.observations || "Néant"}
-
-${pv.dateLeveReserves ? `Date de levée des réserves prévue : ${new Date(pv.dateLeveReserves).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}` : ""}
-
-────────────────────────────────────────
-Signature Conducteur : ___________________    Date : ${d}
-Signature Artisan    : ___________________    Date : ${d}`);
+  // ── Export PV PDF ──
+  const handleExportPV = async () => {
+    const sigMOE = sigMOERef.current?.getDataURL();
+    const sigST  = sigSTRef.current?.getDataURL();
+    exportPVPDF(pv, entreprise, sigMOE, sigST);
+    // Save reference to chantier documents
+    if (pv.chantierId && updateChantier) {
+      setPvSaving(true);
+      const chan = (chantiers||[]).find(c => c.id === pv.chantierId);
+      if (chan) {
+        const docs = chan.documents ? [...chan.documents] : [];
+        const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
+        docs.push({ nom: nomPV, date: pv.date || new Date().toISOString().split("T")[0], type: "PV" });
+        await updateChantier({ ...chan, documents: docs });
+      }
+      setPvSaving(false);
+    }
   };
 
   const exportPDF = (contenu, titre) => {
@@ -2506,44 +2664,106 @@ Signature Artisan    : ___________________    Date : ${d}`);
 
       {/* ── PV DE RÉCEPTION ── */}
       {view === "pv" && (
-        <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:20, flex:1 }}>
-          <div style={{ overflowY:"auto", display:"flex", flexDirection:"column", gap:12, background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:13, fontWeight:600, color:C.muted }}>PV de réception par artisan</div>
+        <div style={{ overflowY:"auto", display:"flex", flexDirection:"column", gap:14 }}>
+
+          {/* En-tête */}
+          <div style={{ background:C.blueL, borderRadius:12, padding:"12px 16px", fontSize:12, color:C.blue, fontWeight:600 }}>
+            📋 Procès Verbal de Réception par Lot — SAS NEO SUD CONSTRUCTION
+          </div>
+
+          {/* Chantier + Date */}
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
               <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Chantier</label>
-              <select value={pv.chantier} onChange={e => setPv(p=>({...p,chantier:e.target.value}))} style={inputStyle}>
+              <select value={pv.chantierId||""} onChange={e => {
+                const c = (chantiers||[]).find(x => String(x.id) === String(e.target.value));
+                setPv(p=>({...p, chantierId: c?.id||null, chantier: c?.client||c?.nom||"", adresseChantier: c?.commune||p.adresseChantier }));
+              }} style={inputStyle}>
                 <option value="">— Sélectionner —</option>
-                {(chantiers||[]).map(c => <option key={c.id} value={c.client||c.nom}>{c.client||c.nom}</option>)}
+                {(chantiers||[]).map(c => <option key={c.id} value={c.id}>{c.client||c.nom}</option>)}
               </select>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <Input label="Artisan / Entreprise" value={pv.artisan} onChange={v => setPv(p=>({...p,artisan:v}))} placeholder="Dupont Maçonnerie" />
-              <Input label="Métier / Corps d'état" value={pv.metier} onChange={v => setPv(p=>({...p,metier:v}))} placeholder="Maçonnerie, Plomberie..." />
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <Input label="Date de réception" value={pv.date} onChange={v => setPv(p=>({...p,date:v}))} type="date" />
-              <Input label="Conducteur de travaux" value={pv.conducteur} onChange={v => setPv(p=>({...p,conducteur:v}))} />
-            </div>
-            <Textarea label="Travaux réalisés" value={pv.travaux} onChange={v => setPv(p=>({...p,travaux:v}))} rows={4} placeholder="Description détaillée des travaux réceptionnés..." />
-            <Textarea label="Réserves" value={pv.reserves} onChange={v => setPv(p=>({...p,reserves:v}))} rows={3} placeholder="Laisser vide si aucune réserve..." />
-            <Textarea label="Observations" value={pv.observations} onChange={v => setPv(p=>({...p,observations:v}))} rows={2} placeholder="Observations complémentaires..." />
-            <Input label="Date de levée des réserves (si applicable)" value={pv.dateLeveReserves} onChange={v => setPv(p=>({...p,dateLeveReserves:v}))} type="date" />
-            <Btn onClick={generatePV}>📄 Générer le PV</Btn>
+            <Input label="Date de réception" value={pv.date} onChange={v => setPv(p=>({...p,date:v}))} type="date" />
           </div>
-          <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:`1px solid ${C.border}` }}>
-              <span style={{ fontWeight:600, fontSize:13 }}>Prévisualisation</span>
-              {pvOutput && (
-                <div style={{ display:"flex", gap:6 }}>
-                  <Btn small variant="ghost" onClick={() => copy(pvOutput)}>📋 Copier</Btn>
-                  <Btn small onClick={() => exportPDF(pvOutput, `PV — ${pv.artisan} — ${pv.chantier}`)}>🖨️ PDF</Btn>
-                </div>
-              )}
+
+          {/* Maître d'ouvrage + présence */}
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"2fr 1fr", gap:12, alignItems:"end" }}>
+            <Input label="Maître d'ouvrage" value={pv.maitreOuvrage} onChange={v => setPv(p=>({...p,maitreOuvrage:v}))} placeholder="Nom du maître d'ouvrage" />
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Présent</label>
+              <div style={{ display:"flex", gap:10 }}>
+                {[["OUI",true],["NON",false]].map(([lbl,val]) => (
+                  <button key={lbl} onClick={() => setPv(p=>({...p,maitreOuvragePresent:val}))} style={{
+                    flex:1, padding:"9px 0", borderRadius:8, border:`1.5px solid ${pv.maitreOuvragePresent===val ? C.blue : C.border}`,
+                    background: pv.maitreOuvragePresent===val ? C.blueL : C.surface,
+                    color: pv.maitreOuvragePresent===val ? C.blue : C.muted,
+                    fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit",
+                  }}>{lbl}</button>
+                ))}
+              </div>
             </div>
-            <pre style={{ flex:1, overflowY:"auto", margin:0, padding:18, color:pvOutput?C.text:C.muted, fontSize:12, lineHeight:1.8, fontFamily:"'Courier New',monospace", whiteSpace:"pre-wrap", background:C.surface2, borderRadius:"0 0 16px 16px" }}>
-              {pvOutput || "Remplis le formulaire et clique sur Générer le PV."}
-            </pre>
           </div>
+
+          {/* Adresse chantier */}
+          <Input label="Adresse chantier" value={pv.adresseChantier} onChange={v => setPv(p=>({...p,adresseChantier:v}))} placeholder="Adresse complète du chantier" />
+
+          {/* Maître d'œuvre + Sous-traitant */}
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
+            <Input label="Maître d'œuvre" value={pv.maitroeuvre} onChange={v => setPv(p=>({...p,maitroeuvre:v}))} placeholder="NEO SUD" />
+            <Input label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" />
+          </div>
+
+          {/* Lot + Poste */}
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr 1fr":"1fr 1fr 1fr", gap:12 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Lot n°</label>
+              <select value={pv.lot} onChange={e => setPv(p=>({...p,lot:e.target.value}))} style={inputStyle}>
+                <option value="">— Lot —</option>
+                {LOTS_PV.map(l => <option key={l.num} value={String(l.num)}>{l.num} – {l.label}</option>)}
+              </select>
+            </div>
+            <Input label="Poste" value={pv.poste} onChange={v => setPv(p=>({...p,poste:v}))} placeholder="Poste concerné" />
+          </div>
+
+          {/* Décision */}
+          <div>
+            <div style={{ fontSize:12, color:C.muted, fontWeight:500, marginBottom:8 }}>Décision de réception</div>
+            <div style={{ display:"flex", flexDirection: mob?"column":"row", gap:8 }}>
+              {[
+                ["sans_reserve","✅ Réception sans réserve","#30d158"],
+                ["avec_reserve","⚠️ Réception avec réserve(s)","#ff9500"],
+                ["non_reception","❌ Non réception","#ff3b30"],
+              ].map(([val,lbl,col]) => (
+                <button key={val} onClick={() => setPv(p=>({...p,statut:val}))} style={{
+                  flex:1, padding:"10px 8px", borderRadius:10, cursor:"pointer", fontFamily:"inherit",
+                  border:`2px solid ${pv.statut===val ? col : C.border}`,
+                  background: pv.statut===val ? col+"18" : C.surface,
+                  color: pv.statut===val ? col : C.muted,
+                  fontWeight: pv.statut===val ? 700 : 400, fontSize:12,
+                }}>{lbl}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Travaux restants + à reprendre */}
+          <Textarea label="Travaux restant à faire" value={pv.travauxRestants} onChange={v => setPv(p=>({...p,travauxRestants:v}))} rows={3} placeholder="Laisser vide si aucun..." />
+          <Textarea label="Travaux à reprendre" value={pv.travauxAReprendre} onChange={v => setPv(p=>({...p,travauxAReprendre:v}))} rows={3} placeholder="Laisser vide si aucun..." />
+
+          {/* Signatures */}
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:16 }}>
+            <SignaturePad label="Signature maître d'œuvre" sigRef={sigMOERef} />
+            <SignaturePad label="Signature Sous-traitant" sigRef={sigSTRef} />
+          </div>
+
+          {/* Bouton export */}
+          <Btn onClick={handleExportPV} disabled={pvSaving}>
+            {pvSaving ? "Enregistrement..." : "🖨️ Générer & Télécharger le PV PDF"}
+          </Btn>
+          {pv.chantierId && (
+            <div style={{ fontSize:11, color:C.muted, textAlign:"center" }}>
+              Le PV sera également enregistré dans les documents du chantier sélectionné.
+            </div>
+          )}
         </div>
       )}
 
