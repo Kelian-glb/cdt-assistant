@@ -1875,7 +1875,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                   style={{ background:"#fff",
                     border:`1.5px solid ${selected===c.id?"#1a1a1a":C.border}`,
                     boxShadow: selected===c.id ? `0 2px 12px rgba(0,0,0,.08), inset 3px 0 0 ${statusCol}` : `0 1px 3px rgba(0,0,0,.04), inset 3px 0 0 ${statusCol}`,
-                    borderRadius:12, padding:"14px 16px", cursor:"pointer" }}>
+                    borderRadius:12, padding:"14px 16px", cursor:"pointer", overflow:"hidden", minWidth:0 }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontWeight:700, fontSize:14, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.client || c.nom}</div>
@@ -1915,9 +1915,9 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                   )}
 
                   {nextAction && (
-                    <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6, padding:"6px 10px", background:"#fff8f0", border:`1px solid ${C.orange}25`, borderRadius:8 }}>
+                    <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6, padding:"6px 10px", background:"#fff8f0", border:`1px solid ${C.orange}25`, borderRadius:8, overflow:"hidden" }}>
                       <span style={{ fontSize:10, fontWeight:700, color:C.orange, flexShrink:0 }}>Prochaine étape</span>
-                      <span style={{ fontSize:11, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>→ {nextAction.texte}</span>
+                      <span style={{ flex:1, minWidth:0, fontSize:11, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>→ {nextAction.texte}</span>
                     </div>
                   )}
 
