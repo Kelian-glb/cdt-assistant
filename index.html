@@ -1849,8 +1849,8 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
 
       <div style={{ display:"grid", gridTemplateColumns: mob ? "1fr" : "1fr 1fr", gap:20, height: mob ? "auto" : "100%" }}>
 
-        {/* liste chantiers */}
-        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {/* liste chantiers — cachée sur mobile quand un chantier est sélectionné ou le form ouvert */}
+        {(!mob || (form === null && !sel)) && <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ color:C.muted, fontSize:12, fontWeight:500, letterSpacing:".04em", textTransform:"uppercase" }}>{(chantiers||[]).length} chantier{(chantiers||[]).length>1?"s":""}</span>
             <div style={{ display:"flex", gap:6 }}>
@@ -1933,10 +1933,10 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
               );
             })}
           </div>
-        </div>
+        </div>}
 
-        {/* détail / form */}
-        <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflowY: mob ? "visible" : "auto", overflowX:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.05)", display:"flex", flexDirection:"column" }}>
+        {/* détail / form — caché sur mobile quand rien n'est sélectionné */}
+        {(!mob || sel !== null || form !== null) && <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflowY: mob ? "visible" : "auto", overflowX:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.05)", display:"flex", flexDirection:"column" }}>
           {form !== null ? (
             <div style={{ padding:22, display:"flex", flexDirection:"column", gap:14 }}>
               <h3 style={{ margin:0, color:"#1a1a1a", fontSize:13, fontWeight:700, letterSpacing:".04em", textTransform:"uppercase" }}>{form==="new"?"Nouveau chantier":"Modifier"}</h3>
@@ -2059,7 +2059,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
               Sélectionne un chantier<br />ou crée-en un nouveau
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </>
   );
