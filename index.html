@@ -80,6 +80,7 @@
       [style*="80px 1fr 56px 56px 72px 26px"] { grid-template-columns: 1fr 52px 52px 64px 26px !important; }
     }
   </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div id="root"></div>
@@ -3425,6 +3426,276 @@ function TabDocuments() {
   );
 }
 
+// ── Planning + Google Agenda ───────────────────────────────────────────────
+function TabPlanning({ supaChantiers }) {
+  const mob = useIsMobile();
+  const { chantiers } = supaChantiers;
+
+  const [gClientId, setGClientId] = useState(() => localStorage.getItem("gca_client_id") || "");
+  const [gToken, setGToken]       = useState(null);
+  const [gEvents, setGEvents]     = useState([]);
+  const [syncing, setSyncing]     = useState(false);
+  const [syncMsg, setSyncMsg]     = useState("");
+  const [showSetup, setShowSetup] = useState(false);
+  const [clientIdDraft, setClientIdDraft] = useState(gClientId);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const tokenClientRef = useRef(null);
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const weekStart = (() => {
+    const d = new Date(); const dow = d.getDay();
+    d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1) + weekOffset * 7);
+    d.setHours(0,0,0,0); return d;
+  })();
+
+  const JOURS_LONG = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+  const JOURS_COURT = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+  const MOIS = ["jan.","fév.","mar.","avr.","mai","jun.","jul.","août","sep.","oct.","nov.","déc."];
+
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+  const weekLabel = (() => {
+    const s = weekStart; const e = weekEnd;
+    if (s.getMonth() === e.getMonth()) return `${s.getDate()} – ${e.getDate()} ${MOIS[s.getMonth()]} ${s.getFullYear()}`;
+    return `${s.getDate()} ${MOIS[s.getMonth()]} – ${e.getDate()} ${MOIS[e.getMonth()]} ${e.getFullYear()}`;
+  })();
+
+  const allLocalRappels = (chantiers||[]).flatMap(c =>
+    (c.rappels||[]).filter(r => !r.regle && r.date)
+      .map(r => ({ ...r, chantierNom: c.client||c.nom }))
+  ).sort((a,b) => a.date.localeCompare(b.date));
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+    const dStr = d.toISOString().split("T")[0];
+    const localEvs = allLocalRappels.filter(r => r.date === dStr).map(r => ({ ...r, source:"local" }));
+    const googleEvs = gEvents.filter(e => (e.start?.date || e.start?.dateTime||"").slice(0,10) === dStr)
+      .map(e => ({ texte: e.summary, source:"google", id: e.id }));
+    return { d, dStr, name: JOURS_COURT[i], longName: JOURS_LONG[i], num: d.getDate(), month: d.getMonth(), isToday: dStr === todayStr, events: [...localEvs, ...googleEvs] };
+  });
+
+  const initTokenClient = () => {
+    if (!gClientId || !window.google?.accounts) return false;
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+      client_id: gClientId,
+      scope: "https://www.googleapis.com/auth/calendar.events",
+      callback: async (resp) => {
+        if (resp.access_token) {
+          setGToken(resp.access_token);
+          await loadGoogleEvents(resp.access_token);
+        } else {
+          setSyncMsg("❌ Connexion Google échouée.");
+        }
+      }
+    });
+    return true;
+  };
+
+  const connectGoogle = () => {
+    if (!gClientId) { setShowSetup(true); return; }
+    if (!tokenClientRef.current) { if (!initTokenClient()) { setShowSetup(true); return; } }
+    tokenClientRef.current.requestAccessToken();
+  };
+
+  const loadGoogleEvents = async (token) => {
+    try {
+      const tMin = new Date(); tMin.setMonth(tMin.getMonth() - 1);
+      const tMax = new Date(); tMax.setMonth(tMax.getMonth() + 3);
+      const r = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${tMin.toISOString()}&timeMax=${tMax.toISOString()}&singleEvents=true&orderBy=startTime&maxResults=500`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await r.json();
+      setGEvents(data.items || []);
+    } catch { setSyncMsg("❌ Erreur chargement Google Agenda."); }
+  };
+
+  const syncToGoogle = async () => {
+    if (!gToken) { connectGoogle(); return; }
+    setSyncing(true); setSyncMsg("");
+    let ok = 0, fail = 0;
+    for (const r of allLocalRappels) {
+      try {
+        const resp = await fetch(
+          "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${gToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              summary: `[CDT] ${r.texte}`,
+              description: `Chantier : ${r.chantierNom}`,
+              start: { dateTime: `${r.date}T09:00:00`, timeZone: "Europe/Paris" },
+              end:   { dateTime: `${r.date}T10:00:00`, timeZone: "Europe/Paris" },
+            })
+          }
+        );
+        resp.ok ? ok++ : fail++;
+      } catch { fail++; }
+    }
+    await loadGoogleEvents(gToken);
+    setSyncMsg(`✅ ${ok} rappel(s) exporté(s) vers Google Agenda${fail ? ` · ${fail} échec(s)` : ""}.`);
+    setSyncing(false);
+  };
+
+  const exportICS = () => {
+    const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//CDT-Assistant//FR","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
+    for (const r of allLocalRappels) {
+      const d = r.date.replace(/-/g,"");
+      lines.push("BEGIN:VEVENT", `UID:cdt-${r.id||Math.random().toString(36).slice(2)}@cdt`, `DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${d}`, `SUMMARY:[CDT] ${r.texte}`, `DESCRIPTION:Chantier : ${r.chantierNom}`, "END:VEVENT");
+    }
+    lines.push("END:VCALENDAR");
+    const blob = new Blob([lines.join("\r\n")], { type:"text/calendar;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "planning-cdt.ics"; a.click();
+  };
+
+  const saveClientId = () => {
+    const id = clientIdDraft.trim();
+    localStorage.setItem("gca_client_id", id);
+    setGClientId(id); tokenClientRef.current = null; setShowSetup(false);
+  };
+
+  const card = (extra={}) => ({ background:"#fff", borderRadius:16, padding:"18px 20px", border:"1px solid rgba(0,0,0,.06)", boxShadow:"0 1px 4px rgba(0,0,0,.05)", ...extra });
+  const btn = (col="#0071e3", txt="#fff") => ({ background:col, color:txt, border:"none", borderRadius:10, padding:"9px 18px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", flexShrink:0 });
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+
+      {/* Setup modal */}
+      {showSetup && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+          <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:520, padding:"28px 24px", boxShadow:"0 20px 60px rgba(0,0,0,.2)" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+              <div style={{ fontSize:17, fontWeight:700 }}>🔧 Configurer Google Agenda</div>
+              <button onClick={() => setShowSetup(false)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:22, color:"#888" }}>×</button>
+            </div>
+            <div style={{ fontSize:13, color:"#6d6d72", lineHeight:1.7, marginBottom:16 }}>
+              Pour synchroniser avec Google Agenda, créez des identifiants OAuth dans Google Cloud :<br/>
+              <ol style={{ margin:"10px 0 10px 18px", padding:0, display:"flex", flexDirection:"column", gap:4 }}>
+                <li>Allez sur <strong>console.cloud.google.com</strong></li>
+                <li>Créez un projet → activez l'<strong>API Google Calendar</strong></li>
+                <li>Identifiants → <strong>ID client OAuth 2.0</strong> (Application Web)</li>
+                <li>Origines JS autorisées : <code style={{ background:"#f2f2f7", borderRadius:4, padding:"1px 5px" }}>https://kelian-glb.github.io</code></li>
+                <li>Copiez l'<strong>ID client</strong> ci-dessous</li>
+              </ol>
+            </div>
+            <input
+              placeholder="Collez votre Client ID Google ici..."
+              value={clientIdDraft}
+              onChange={e => setClientIdDraft(e.target.value)}
+              style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"1px solid rgba(0,0,0,.12)", fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box", marginBottom:14 }}
+            />
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setShowSetup(false)} style={{ ...btn("#f2f2f7","#1c1c1e") }}>Annuler</button>
+              <button onClick={saveClientId} disabled={!clientIdDraft.trim()} style={{ ...btn() }}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div style={{ fontSize:mob?18:22, fontWeight:700, color:"#1c1c1e", letterSpacing:"-.02em" }}>Planning</div>
+          <div style={{ fontSize:12, color:"#6d6d72", marginTop:2 }}>{allLocalRappels.length} rappel(s) au total</div>
+        </div>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          {gToken
+            ? <button onClick={syncToGoogle} disabled={syncing} style={{ ...btn("#30d158") }}>
+                {syncing ? "⏳ Sync..." : "🔄 Sync Google Agenda"}
+              </button>
+            : <button onClick={connectGoogle} style={{ ...btn("#4285f4") }}>
+                <span style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#fff" d="M43.6 20H24v8h11.3C33.9 33.6 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.3 6.5 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z"/></svg>
+                  Connecter Google Agenda
+                </span>
+              </button>
+          }
+          <button onClick={exportICS} style={{ ...btn("#f2f2f7","#1c1c1e") }}>⬇ Exporter .ics</button>
+          {!gToken && gClientId && <button onClick={() => setShowSetup(true)} style={{ ...btn("#f2f2f7","#6d6d72") }}>⚙</button>}
+          {!gClientId && <button onClick={() => setShowSetup(true)} style={{ ...btn("#f2f2f7","#6d6d72"), fontSize:11 }}>Configurer</button>}
+        </div>
+      </div>
+
+      {syncMsg && (
+        <div style={{ background:syncMsg.startsWith("✅")?"#f0fff4":"#fff5f5", border:`1px solid ${syncMsg.startsWith("✅")?"#30d158":"#ff3b30"}30`, borderRadius:12, padding:"10px 16px", fontSize:13, color:"#1c1c1e" }}>
+          {syncMsg}
+        </div>
+      )}
+
+      {/* Google status banner */}
+      {gToken && (
+        <div style={{ background:"#f0f7ff", border:"1px solid #4285f430", borderRadius:12, padding:"10px 16px", fontSize:13, color:"#1c1c1e", display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ color:"#30d158", fontSize:16 }}>●</span>
+          Google Agenda connecté — {gEvents.length} événement(s) chargé(s).
+          <button onClick={() => { setGToken(null); setGEvents([]); }} style={{ marginLeft:"auto", background:"none", border:"none", color:"#6d6d72", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>Déconnecter</button>
+        </div>
+      )}
+
+      {/* Week navigation */}
+      <div style={card({ padding:"14px 18px" })}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          <button onClick={() => setWeekOffset(o => o-1)} style={{ ...btn("#f2f2f7","#1c1c1e"), padding:"6px 12px" }}>‹</button>
+          <div style={{ flex:1, textAlign:"center", fontSize:14, fontWeight:600, color:"#1c1c1e" }}>{weekLabel}</div>
+          <button onClick={() => { setWeekOffset(0); }} style={{ ...btn(weekOffset===0?"#e8f1fb":"#f2f2f7", weekOffset===0?"#0071e3":"#1c1c1e"), padding:"6px 12px", fontSize:11 }}>Auj.</button>
+          <button onClick={() => setWeekOffset(o => o+1)} style={{ ...btn("#f2f2f7","#1c1c1e"), padding:"6px 12px" }}>›</button>
+        </div>
+
+        {/* Days grid */}
+        <div style={{ display:"grid", gridTemplateColumns:mob?"repeat(3,1fr)":"repeat(7,1fr)", gap:6 }}>
+          {weekDays.map((day, i) => (
+            <div key={i} style={{ borderRadius:12, padding:"10px 8px", background:day.isToday?"#e8f1fb":"#f5f4f0", border:`1.5px solid ${day.isToday?"#0071e3":"transparent"}`, minHeight:90 }}>
+              <div style={{ textAlign:"center", marginBottom:8 }}>
+                <div style={{ fontSize:10, fontWeight:600, color:day.isToday?"#0071e3":"#6d6d72", textTransform:"uppercase", letterSpacing:".04em" }}>{day.name}</div>
+                <div style={{ fontSize:18, fontWeight:day.isToday?700:400, color:day.isToday?"#0071e3":"#1c1c1e", lineHeight:1.2 }}>{day.num}</div>
+                {day.month !== weekStart.getMonth() && <div style={{ fontSize:9, color:"#aeaeb2" }}>{MOIS[day.month]}</div>}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                {day.events.slice(0,3).map((ev, j) => (
+                  <div key={j} style={{ fontSize:10, padding:"3px 6px", borderRadius:6, background:ev.source==="google"?"#e8f0fe":"#fff", color:ev.source==="google"?"#4285f4":"#1c1c1e", border:`1px solid ${ev.source==="google"?"#4285f420":"rgba(0,0,0,.06)"}`, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={ev.texte}>
+                    {ev.source==="google" && <span style={{ marginRight:3 }}>G</span>}{ev.texte}
+                  </div>
+                ))}
+                {day.events.length > 3 && <div style={{ fontSize:9, color:"#6d6d72", textAlign:"center" }}>+{day.events.length-3}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Upcoming events list */}
+      <div style={card()}>
+        <div style={{ fontWeight:600, fontSize:14, marginBottom:12 }}>Prochains rappels</div>
+        {allLocalRappels.filter(r => r.date >= todayStr).length === 0
+          ? <div style={{ color:"#6d6d72", fontSize:13, textAlign:"center", padding:"20px 0" }}>Aucun rappel à venir — ajoutez des rappels depuis vos chantiers.</div>
+          : <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {allLocalRappels.filter(r => r.date >= todayStr).slice(0,10).map((r, i) => {
+                const d = new Date(r.date+"T12:00");
+                const isToday = r.date === todayStr;
+                const diffDays = Math.round((d - new Date()) / 86400000);
+                return (
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 12px", background:"#f5f4f0", borderRadius:12, borderLeft:`3px solid ${isToday?"#0071e3":diffDays<=3?"#ff9500":"#e5e5ea"}` }}>
+                    <div style={{ minWidth:44, textAlign:"center" }}>
+                      <div style={{ fontSize:16, fontWeight:700, color:isToday?"#0071e3":"#1c1c1e", lineHeight:1 }}>{d.getDate()}</div>
+                      <div style={{ fontSize:10, color:"#6d6d72" }}>{MOIS[d.getMonth()]}</div>
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:"#1c1c1e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.texte}</div>
+                      <div style={{ fontSize:11, color:"#6d6d72" }}>{r.chantierNom}</div>
+                    </div>
+                    <div style={{ fontSize:10, fontWeight:600, color:isToday?"#0071e3":diffDays<=3?"#ff9500":"#aeaeb2", whiteSpace:"nowrap" }}>
+                      {isToday ? "Aujourd'hui" : diffDays===1 ? "Demain" : `Dans ${diffDays}j`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+        }
+      </div>
+
+    </div>
+  );
+}
+
 // ── Stubs ──────────────────────────────────────────────────────────────────
 function TabStub({ label, icon, desc }) {
   return (
@@ -3642,7 +3913,7 @@ function App() {
           {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} />}
           {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
           {tab === "documents"  && <TabDocuments />}
-          {tab === "planning"   && <TabStub label="Planning" icon="📅" desc="Vue calendrier de vos chantiers — bientôt disponible." />}
+          {tab === "planning"   && <TabPlanning supaChantiers={supaChantiers} />}
           {tab === "equipe"     && <TabStub label="Équipe" icon="👥" desc="Gestion des membres de l'équipe — bientôt disponible." />}
           {tab === "rapports"   && <TabStub label="Rapports" icon="📊" desc="Génération de rapports — bientôt disponible." />}
           {tab === "parametres" && <TabStub label="Paramètres" icon="⚙️" desc="Configuration de l'application." />}
