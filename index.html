@@ -2492,22 +2492,23 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
   };
 
   // ── Export PV PDF ──
-  const handleExportPV = async () => {
+  const handlePrintPV = () => {
     const sigMOE = sigMOERef.current?.getDataURL();
     const sigST  = sigSTRef.current?.getDataURL();
     exportPVPDF(pv, entreprise, sigMOE, sigST);
-    // Save reference to chantier documents
-    if (pv.chantierId && updateChantier) {
-      setPvSaving(true);
-      const chan = (chantiers||[]).find(c => c.id === pv.chantierId);
-      if (chan) {
-        const docs = chan.documents ? [...chan.documents] : [];
-        const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
-        docs.push({ nom: nomPV, date: pv.date || new Date().toISOString().split("T")[0], type: "PV" });
-        await updateChantier({ ...chan, documents: docs });
-      }
-      setPvSaving(false);
+  };
+
+  const handleSavePV = async () => {
+    if (!pv.chantierId || !updateChantier) return;
+    setPvSaving(true);
+    const chan = (chantiers||[]).find(c => c.id === pv.chantierId);
+    if (chan) {
+      const docs = chan.documents ? [...chan.documents] : [];
+      const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
+      docs.push({ nom: nomPV, date: pv.date || new Date().toISOString().split("T")[0], type: "PV" });
+      await updateChantier({ ...chan, documents: docs });
     }
+    setPvSaving(false);
   };
 
   const exportPDF = (contenu, titre) => {
@@ -2755,13 +2756,18 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
             <SignaturePad label="Signature Sous-traitant" sigRef={sigSTRef} />
           </div>
 
-          {/* Bouton export */}
-          <Btn onClick={handleExportPV} disabled={pvSaving}>
-            {pvSaving ? "Enregistrement..." : "🖨️ Générer & Télécharger le PV PDF"}
-          </Btn>
-          {pv.chantierId && (
+          {/* Boutons export */}
+          <div style={{ display:"flex", gap:10 }}>
+            <Btn onClick={handlePrintPV} style={{ flex:1 }}>
+              🖨️ Générer le PDF
+            </Btn>
+            <Btn onClick={handleSavePV} disabled={pvSaving || !pv.chantierId} variant="ghost" style={{ flex:1 }}>
+              {pvSaving ? "Enregistrement..." : "💾 Classer dans le chantier"}
+            </Btn>
+          </div>
+          {!pv.chantierId && (
             <div style={{ fontSize:11, color:C.muted, textAlign:"center" }}>
-              Le PV sera également enregistré dans les documents du chantier sélectionné.
+              Sélectionne un chantier pour pouvoir classer le PV dans ses documents.
             </div>
           )}
         </div>
