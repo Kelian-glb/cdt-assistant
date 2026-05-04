@@ -606,7 +606,7 @@ ${cr.prochainRdv?`<h2>Prochain RDV</h2><div style="background:#f2f2f7;border-rad
 
 function exportPVPDF(pv, entreprise, sigMOE, sigST) {
   const dateStr = pv.date ? new Date(pv.date+"T12:00").toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}) : "—";
-  const logoUrl = "https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png";
+  const logoUrl = pv.logoUrl || "https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png";
   const chk = (val) => val ? "☑" : "☐";
   const statutSans = pv.statut === "sans_reserve";
   const statutAvec = pv.statut === "avec_reserve";
@@ -2423,12 +2423,18 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise }) {
   const [viewingCR, setViewingCR] = useState(null);
 
   // ── PV state ──
+  const NEO_LOGO = "https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png";
   const [pv, setPv] = useState({
     chantier:"", chantierId:null, date:today,
     maitreOuvrage:"", maitreOuvragePresent:true, adresseChantier:"",
     maitroeuvre:"NEO SUD", sousTraitant:"", lot:"", poste:"",
     statut:"sans_reserve", travauxRestants:"", travauxAReprendre:"",
+    logoUrl:"",
   });
+
+  useEffect(() => {
+    if (entreprise?.logo_url) setPv(p => p.logoUrl ? p : { ...p, logoUrl: entreprise.logo_url });
+  }, [entreprise]);
   const [pvSaving, setPvSaving] = useState(false);
   const sigMOERef = React.useRef();
   const sigSTRef  = React.useRef();
@@ -2675,6 +2681,29 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
           {/* En-tête */}
           <div style={{ background:C.blueL, borderRadius:12, padding:"12px 16px", fontSize:12, color:C.blue, fontWeight:600 }}>
             📋 Procès Verbal de Réception par Lot — SAS NEO SUD CONSTRUCTION
+          </div>
+
+          {/* Logo */}
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Logo du PV (URL de l'image)</label>
+            <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+              {(pv.logoUrl || NEO_LOGO) && (
+                <img src={pv.logoUrl || NEO_LOGO} alt="logo" style={{ height:44, maxWidth:120, objectFit:"contain", borderRadius:6, border:`1px solid ${C.border}`, background:"#fff", padding:4 }} onError={e => e.target.style.display="none"} />
+              )}
+              <div style={{ flex:1, display:"flex", flexDirection:"column", gap:6 }}>
+                <input value={pv.logoUrl} onChange={e => setPv(p=>({...p,logoUrl:e.target.value}))} placeholder="https://..." style={{ ...inputStyle, fontSize:12 }} />
+                <div style={{ display:"flex", gap:6 }}>
+                  {entreprise?.logo_url && (
+                    <button onClick={() => setPv(p=>({...p,logoUrl:entreprise.logo_url}))} style={{ fontSize:11, color:C.blue, background:C.blueL, border:"none", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>
+                      ↩ Logo entreprise
+                    </button>
+                  )}
+                  <button onClick={() => setPv(p=>({...p,logoUrl:NEO_LOGO}))} style={{ fontSize:11, color:C.muted, background:C.surface2, border:"none", borderRadius:6, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>
+                    ↩ Logo NEO SUD
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Chantier + Date */}
