@@ -1256,41 +1256,72 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
       )}
 
       {/* Row 1 (desktop): Activité aujourd'hui + Actions rapides */}
-      {!mob && <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:14 }}>
+      {!mob && <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
 
-        <div style={card()}>
-          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:18 }}>Votre activité aujourd'hui</div>
-          <div style={{ display:"flex", gap:12 }}>
+        {/* VOTRE ACTIVITÉ AUJOURD'HUI */}
+        <div style={card({ padding:"24px 28px" })}>
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:22 }}>Votre activité aujourd'hui</div>
+          <div style={{ display:"flex" }}>
             {[
-              { icon:"🏗️", val:enCours,           label:"Chantier"+(enCours!==1?"s":"")+" actif"+(enCours!==1?"s":""), color:C.text },
-              { icon:"⚠️", val:alertes.length,     label:"Alerte"+(alertes.length!==1?"s":""),                         color:alertes.length>0?C.orange:C.muted },
-              { icon:"✅", val:todayRappels.length, label:"Action"+(todayRappels.length!==1?"s":"")+" aujourd'hui",    color:todayRappels.length>0?C.blue:C.muted },
+              {
+                icon: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+                val: enCours, label: "Chantier"+(enCours!==1?"s":"")+" actif"+(enCours!==1?"s":""),
+                color: C.text, bg: "#f5f4f0"
+              },
+              {
+                icon: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+                val: alertes.length, label: "Alerte"+(alertes.length!==1?"s":""),
+                color: alertes.length>0 ? C.orange : C.muted, bg: alertes.length>0 ? C.orange+"0d" : "#f5f4f0"
+              },
+              {
+                icon: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+                val: todayRappels.length, label: "Action"+(todayRappels.length!==1?"s":"")+" à faire",
+                color: todayRappels.length>0 ? C.blue : C.muted, bg: todayRappels.length>0 ? C.blue+"0d" : "#f5f4f0"
+              },
             ].map((s,i) => (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:14, flex:1, padding:"16px 18px", background:C.surface2, borderRadius:16 }}>
-                <div style={{ fontSize:30 }}>{s.icon}</div>
+              <div key={i} style={{ flex:1, display:"flex", alignItems:"center", gap:16, padding:"16px 22px", borderLeft: i>0 ? `1px solid rgba(0,0,0,.07)` : "none" }}>
+                <div style={{ width:52, height:52, borderRadius:14, background:s.bg, display:"flex", alignItems:"center", justifyContent:"center", color:s.color, flexShrink:0 }}>
+                  {s.icon}
+                </div>
                 <div>
-                  <div style={{ fontSize:30, fontWeight:700, color:s.color, letterSpacing:"-.03em", lineHeight:1 }}>{s.val}</div>
-                  <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>{s.label}</div>
+                  <div style={{ fontSize:34, fontWeight:700, color:s.color, letterSpacing:"-.04em", lineHeight:1 }}>{s.val}</div>
+                  <div style={{ fontSize:12, color:C.muted, marginTop:5, lineHeight:1.3 }}>{s.label}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div style={card()}>
-          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:18 }}>Actions rapides</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+        {/* ACTIONS RAPIDES */}
+        <div style={card({ padding:"24px 28px" })}>
+          <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase", marginBottom:22 }}>Actions rapides</div>
+          <div style={{ display:"flex" }}>
             {[
-              { icon:"➕", label:"Nouveau chantier", action:() => onNavigate("chantiers") },
-              { icon:"📐", label:"Faire un calcul",  action:() => onNavigate("calculs") },
-              { icon:"📝", label:"Créer un PV",      action:() => onNavigate("cr") },
-              { icon:"📅", label:"Ajouter un RDV",   action:() => onNavigate("chantiers") },
+              {
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+                label:"Nouveau chantier", action:() => onNavigate("chantiers")
+              },
+              {
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+                label:"Faire un calcul", action:() => onNavigate("calculs")
+              },
+              {
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+                label:"Créer un PV", action:() => onNavigate("cr")
+              },
+              {
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+                label:"Ajouter un RDV", action:() => onNavigate("chantiers")
+              },
             ].map((a,i) => (
-              <button key={i} onClick={a.action} style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", background:C.surface2, border:"1px solid transparent", borderRadius:12, cursor:"pointer", fontFamily:"inherit" }}
-                onMouseEnter={e => { e.currentTarget.style.background="#ede9e4"; e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform="translateY(-1px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background=C.surface2; e.currentTarget.style.borderColor="transparent"; e.currentTarget.style.transform="none"; }}>
-                <span style={{ fontSize:18 }}>{a.icon}</span>
-                <span style={{ fontSize:12, color:C.text, fontWeight:500 }}>{a.label}</span>
+              <button key={i} onClick={a.action}
+                style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:12, padding:"16px 8px", background:"transparent", border:"none", borderLeft: i>0 ? `1px solid rgba(0,0,0,.07)` : "none", cursor:"pointer", fontFamily:"inherit", transition:"background .15s" }}
+                onMouseEnter={e => e.currentTarget.style.background="#f5f4f0"}
+                onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                <div style={{ width:52, height:52, borderRadius:14, background:"#f5f4f0", border:"1px solid rgba(0,0,0,.08)", display:"flex", alignItems:"center", justifyContent:"center", color:C.text }}>
+                  {a.icon}
+                </div>
+                <span style={{ fontSize:12, color:C.text, fontWeight:500, textAlign:"center", lineHeight:1.3 }}>{a.label}</span>
               </button>
             ))}
           </div>
