@@ -2103,10 +2103,11 @@ Signature Artisan    : ___________________    Date : ${d}`);
 
   const tabBtn = (id, label) => (
     <button key={id} onClick={() => setView(id)} style={{
-      background: view===id ? C.surface : "transparent", border:"none", borderRadius:8,
-      padding:"7px 14px", fontSize: mob?12:13, fontWeight: view===id ? 600 : 400,
+      flex:1, background: view===id ? C.surface : "transparent", border:"none", borderRadius:8,
+      padding:mob?"8px 6px":"7px 14px", fontSize: mob?11:13, fontWeight: view===id ? 600 : 400,
       color: view===id ? C.text : C.muted, cursor:"pointer", fontFamily:"inherit",
       boxShadow: view===id ? "0 1px 3px rgba(0,0,0,.1)" : "none", whiteSpace:"nowrap",
+      textAlign:"center",
     }}>{label}</button>
   );
 
@@ -2116,11 +2117,10 @@ Signature Artisan    : ___________________    Date : ${d}`);
     <div style={{ display:"flex", flexDirection:"column", gap:16, height:"100%" }}>
 
       {/* onglets */}
-      <div style={{ display:"flex", background:C.surface2, borderRadius:10, padding:3, overflowX:"auto", width:"fit-content", maxWidth:"100%" }}>
-        {tabBtn("form","✏️ Nouveau CR")}
-        {tabBtn("pv","📝 PV Réception")}
-        {tabBtn("entreprise","🏢 Mon entreprise")}
-        {tabBtn("historique",`📚 Historique (${(crs||[]).length})`)}
+      <div style={{ display:"flex", background:C.surface2, borderRadius:10, padding:3, width:"100%" }}>
+        {tabBtn("form", mob ? "✏️ CR" : "✏️ Nouveau CR")}
+        {tabBtn("pv", mob ? "📝 PV" : "📝 PV Réception")}
+        {tabBtn("historique", mob ? `📚 (${(crs||[]).length})` : `📚 Historique (${(crs||[]).length})`)}
       </div>
 
       {/* ── NOUVEAU CR ── */}
