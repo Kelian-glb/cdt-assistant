@@ -69,15 +69,67 @@
     /* Transitions douces */
     button, input, select, textarea, a { transition: all .18s cubic-bezier(.4,0,.2,1); }
 
-    /* Mobile */
+    /* ── Mobile global ──────────────────────────────────────────────────────── */
     @media (max-width: 700px) {
-      html, body { overflow-x: hidden; }
+
+      /* Overflow */
+      html, body, #root { overflow-x: hidden; }
+      * { max-width: 100%; box-sizing: border-box; }
+
+      /* Typographie */
       input, select, textarea { font-size: 16px !important; }
+
+      /* Zones cliquables */
       button { min-height: 44px; }
+      input:not([type="checkbox"]):not([type="radio"]), select { min-height: 44px; }
+
+      /* Grilles → 1 colonne sur mobile */
       [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
-      [style*="gridTemplateColumns:\"1fr 1fr\""] { grid-template-columns: 1fr !important; }
+      [style*="grid-template-columns: 2fr 1fr"] { grid-template-columns: 1fr !important; }
       [style*="grid-template-columns: 1fr 1fr 1fr"] { grid-template-columns: 1fr 1fr !important; }
+      [style*="repeat(3,1fr)"] { grid-template-columns: 1fr 1fr !important; }
+      [style*="repeat(3, 1fr)"] { grid-template-columns: 1fr 1fr !important; }
+      [style*="repeat(5,1fr)"] { grid-template-columns: 1fr 1fr 1fr !important; }
+
+      /* Table calculs (GO, Briques…) */
       [style*="80px 1fr 56px 56px 72px 26px"] { grid-template-columns: 1fr 52px 52px 64px 26px !important; }
+
+      /* Modal Modèles */
+      .modeles-modal {
+        width: calc(100vw - 24px) !important;
+        max-height: 92vh !important;
+        border-radius: 12px !important;
+        margin: 12px;
+      }
+
+      /* Formulaires empilés sur mobile */
+      .m-add-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+      }
+      .m-add-row > * { width: 100% !important; }
+      .m-prix-wrap { width: 100% !important; }
+      .m-prix-wrap input { width: 100% !important; }
+
+      /* Bouton pleine largeur */
+      .m-full {
+        width: 100% !important;
+        align-self: stretch !important;
+      }
+
+      /* Réduction padding cards et conteneurs sur mobile */
+      [style*="padding: 24px 28px"] { padding: 16px 14px !important; }
+      [style*="padding:\"24px 28px\""] { padding: 16px 14px !important; }
+
+      /* Textes légèrement réduits */
+      [style*="font-size: 26px"] { font-size: 20px !important; }
+      [style*="font-size: 22px"] { font-size: 18px !important; }
+      [style*="font-size: 18px"] { font-size: 16px !important; }
+
+      /* Scrollbars visibles sur mobile pour zones horizontales */
+      [style*="overflow-x: auto"], [style*="overflowX:\"auto\""] {
+        -webkit-overflow-scrolling: touch;
+      }
     }
   </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -840,7 +892,7 @@ function ModelesPanel({ phases, modeles, onSavePhases, onSaveModele, onClose }) 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.4)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center" }}
       onClick={onClose}>
-      <div style={{ background:"#fff", borderRadius:16, width:720, maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 12px 50px rgba(0,0,0,.22)", overflow:"hidden" }}
+      <div className="modeles-modal" style={{ background:"#fff", borderRadius:16, width:720, maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 12px 50px rgba(0,0,0,.22)", overflow:"hidden" }}
         onClick={e => e.stopPropagation()}>
 
         {/* header */}
@@ -1944,7 +1996,7 @@ function DocumentsTab({ chantier, onUpdate }) {
         <div style={{ fontSize:11, color:C.muted, fontWeight:600, letterSpacing:".07em", textTransform:"uppercase", marginBottom:10 }}>Ajouter un document</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           <input value={draft.nom} onChange={e=>setDraft(d=>({...d,nom:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&add()} placeholder="Nom du document..." style={{ ...inputS, width:"100%" }} />
-          <div style={{ display:"flex", gap:8 }}>
+          <div className="m-add-row" style={{ display:"flex", gap:8 }}>
             <select value={draft.type} onChange={e=>setDraft(d=>({...d,type:e.target.value}))} style={{ ...inputS, flex:1 }}>
               {DOC_TYPES.map(t => <option key={t}>{t}</option>)}
             </select>
@@ -2137,7 +2189,7 @@ function RappelsPanel({ chantier, onUpdate, phases }) {
             </div>
           </div>
 
-          <button onClick={save} style={{ background:C.blue, color:"#fff", border:"none", borderRadius:8, padding:"9px 20px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start", boxShadow:`0 1px 4px ${C.blue}40` }}>
+          <button onClick={save} className="m-full" style={{ background:C.blue, color:"#fff", border:"none", borderRadius:8, padding:"9px 20px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start", boxShadow:`0 1px 4px ${C.blue}40` }}>
             Enregistrer
           </button>
         </div>
@@ -3520,7 +3572,7 @@ function CalcPrixList({ supaMetres }) {
         <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".07em", textTransform:"uppercase", marginBottom:10 }}>
           Ajouter un prix
         </div>
-        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+        <div className="m-add-row" style={{ display:"flex", gap:10, alignItems:"center" }}>
           <input
             value={draft.nom}
             onChange={e => setDraft(d => ({ ...d, nom: e.target.value }))}
@@ -3528,7 +3580,7 @@ function CalcPrixList({ supaMetres }) {
             placeholder="Nom du produit ou matériau..."
             style={{ ...inputS(), flex:1 }}
           />
-          <div style={{ position:"relative", flexShrink:0 }}>
+          <div className="m-prix-wrap" style={{ position:"relative", flexShrink:0 }}>
             <input
               type="number"
               value={draft.prix}
