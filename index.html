@@ -1151,7 +1151,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
   const heure = new Date().getHours();
   const salut = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
-  const card = (extra={}) => ({ background:"#fff", borderRadius:mob?12:16, padding:mob?"12px 14px":"18px 20px", border:"1px solid rgba(0,0,0,.06)", boxShadow:"0 1px 4px rgba(0,0,0,.05)", ...extra });
+  const card = (extra={}) => ({ background:"#fff", borderRadius:mob?16:22, padding:mob?"16px 18px":"24px 28px", border:"1px solid rgba(0,0,0,.07)", boxShadow:"0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.04)", ...extra });
 
   const DonutScore = ({ score, color }) => {
     const r=40, cx=55, cy=55, circ=2*Math.PI*r, prog=(score/100)*circ;
@@ -1199,7 +1199,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
       {/* Mobile: résumé rapide + actions rapides */}
       {mob && (
         <>
-          <div style={{ background:"#fff", borderRadius:12, padding:"10px 14px", border:"1px solid rgba(0,0,0,.06)", display:"flex", flexWrap:"wrap", gap:10, alignItems:"center", fontSize:12 }}>
+          <div style={{ background:"#fff", borderRadius:16, padding:"12px 18px", border:"1px solid rgba(0,0,0,.07)", boxShadow:"0 2px 8px rgba(0,0,0,.06)", display:"flex", flexWrap:"wrap", gap:10, alignItems:"center", fontSize:12 }}>
             <span><strong style={{ color:C.text }}>{chantiers.length}</strong> <span style={{ color:C.muted }}>chantier{chantiers.length>1?"s":""}</span></span>
             <span style={{ color:C.border }}>·</span>
             <span><strong style={{ color:C.blue }}>{enCours}</strong> <span style={{ color:C.muted }}>en cours</span></span>
@@ -1213,9 +1213,9 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
               { icon:"📝", label:"Créer un PV",      action:() => onNavigate("cr") },
               { icon:"📁", label:"Documents",        action:() => onNavigate("documents") },
             ].map((a,i) => (
-              <button key={i} onClick={a.action} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background:"#fff", border:"1px solid rgba(0,0,0,.06)", borderRadius:12, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 1px 3px rgba(0,0,0,.04)" }}>
-                <span style={{ fontSize:20 }}>{a.icon}</span>
-                <span style={{ fontSize:12, color:C.text, fontWeight:500, textAlign:"left", lineHeight:1.3 }}>{a.label}</span>
+              <button key={i} onClick={a.action} style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 16px", background:"#fff", border:"1px solid rgba(0,0,0,.07)", borderRadius:16, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+                <div style={{ width:36, height:36, borderRadius:10, background:C.surface2, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>{a.icon}</div>
+                <span style={{ fontSize:12, color:C.text, fontWeight:600, textAlign:"left", lineHeight:1.3 }}>{a.label}</span>
               </button>
             ))}
           </div>
@@ -1226,7 +1226,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
       <div style={{ display:"grid", gridTemplateColumns:mob?"1fr":"1fr 1fr 1fr", gap:14 }}>
 
         <div style={card()}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.muted, marginBottom:12 }}>Score global</div>
+          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, letterSpacing:"-.01em" }}>Score global</div>
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
             <DonutScore score={score} color={scoreColor}/>
             <div>
@@ -1238,8 +1238,8 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         </div>
 
         <div style={card()}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.muted, marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
-            Alertes {alertes.length > 0 && <span style={{ background:C.red, color:"#fff", borderRadius:99, fontSize:10, fontWeight:700, padding:"1px 7px" }}>{alertes.length}</span>}
+          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, letterSpacing:"-.01em", display:"flex", alignItems:"center", gap:8 }}>
+            Alertes {alertes.length > 0 && <span style={{ background:C.red, color:"#fff", borderRadius:99, fontSize:10, fontWeight:700, padding:"2px 8px" }}>{alertes.length}</span>}
           </div>
           {alertes.length === 0
             ? <div style={{ color:C.green, fontSize:13, fontWeight:500 }}>✅ Aucune alerte — tout va bien !</div>
@@ -1259,7 +1259,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         </div>
 
         <div style={card({ background:"linear-gradient(135deg,#f5f0ff 0%,#fff 70%)" })}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.blue, marginBottom:12 }}>Prochaine action recommandée</div>
+          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, letterSpacing:"-.01em" }}>Prochaine action recommandée</div>
           {prochaineAction
             ? <div>
                 <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
@@ -1286,12 +1286,12 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
           { val:termines,         label:"Terminés",        icon:"✅",  color:C.green,  sub:"+0 ce mois-ci" },
           { val:bloques,          label:"Bloqués",         icon:"🔴",  color:C.red,    sub:bloques>0?"⚠️ action requise":"-" },
         ].map((s,i) => (
-          <div key={i} onClick={() => onNavigate("chantiers")} style={{ ...card({ cursor:"pointer", padding:"14px 16px" }) }}
-            onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
+          <div key={i} onClick={() => onNavigate("chantiers")} style={{ ...card({ cursor:"pointer", padding:"18px 20px" }) }}
+            onMouseEnter={e => e.currentTarget.style.transform="translateY(-3px)"}
             onMouseLeave={e => e.currentTarget.style.transform="none"}>
-            <div style={{ fontSize:18, marginBottom:6 }}>{s.icon}</div>
-            <div style={{ fontSize:24, fontWeight:700, color:s.color, letterSpacing:"-.02em" }}>{s.val}</div>
-            <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{s.label}</div>
+            <div style={{ width:40, height:40, borderRadius:12, background:s.color+"18", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, marginBottom:12 }}>{s.icon}</div>
+            <div style={{ fontSize:26, fontWeight:700, color:s.color, letterSpacing:"-.03em" }}>{s.val}</div>
+            <div style={{ fontSize:12, color:C.text, fontWeight:600, marginTop:3 }}>{s.label}</div>
             <div style={{ fontSize:10, color:s.sub.includes("+")&&s.sub!=="+0 ce mois-ci"?C.green:C.muted, marginTop:3, fontWeight:500 }}>{s.sub}</div>
           </div>
         ))}
@@ -1302,7 +1302,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
         <div style={card()}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2 }}>
-            <span style={{ fontWeight:600, fontSize:14 }}>Avancement global</span>
+            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Avancement global</span>
             <span style={{ fontWeight:700, fontSize:18, color:C.blue }}>{avgPct}%</span>
           </div>
           <div style={{ fontSize:11, color:C.green, marginBottom:10, fontWeight:500 }}>↑ Progression en cours</div>
@@ -1311,7 +1311,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         </div>
 
         <div style={card()}>
-          <div style={{ fontWeight:600, fontSize:14, marginBottom:12 }}>Comparaison des chantiers</div>
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:14, letterSpacing:"-.01em", color:C.text }}>Comparaison des chantiers</div>
           {chantiers.length === 0
             ? <div style={{ color:C.muted, fontSize:13, textAlign:"center", padding:"20px 0" }}>Aucun chantier</div>
             : <>
@@ -1346,7 +1346,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
         <div style={card()}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <span style={{ fontWeight:600, fontSize:14 }}>Chantiers récents</span>
+            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Chantiers récents</span>
             <button onClick={() => onNavigate("chantiers")} style={{ background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:500, padding:0 }}>Voir tout →</button>
           </div>
           {chantiers.length === 0
@@ -1390,7 +1390,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
         <div style={card()}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-            <span style={{ fontWeight:600, fontSize:14 }}>Aujourd'hui</span>
+            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Aujourd'hui</span>
             {todayRappels.length > 0 && <span style={{ background:C.blue+"18", color:C.blue, borderRadius:99, fontSize:10, fontWeight:700, padding:"2px 8px" }}>{todayRappels.length}</span>}
           </div>
           {(todayRappels.length === 0 && rappelsBientot.length === 0)
@@ -1417,7 +1417,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         </div>
 
         <div style={card()}>
-          <div style={{ fontWeight:600, fontSize:14, marginBottom:12 }}>Actions rapides</div>
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:14, letterSpacing:"-.01em", color:C.text }}>Actions rapides</div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
             {[
               { icon:"➕", label:"Nouveau chantier", action:() => onNavigate("chantiers") },
@@ -1429,11 +1429,11 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
               { icon:"📊", label:"Rapport",          action:() => onNavigate("rapports") },
               { icon:"👥", label:"Équipe",           action:() => onNavigate("equipe") },
             ].map((a,i) => (
-              <button key={i} onClick={a.action} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, padding:"12px 8px", background:C.surface2, border:"1px solid transparent", borderRadius:12, cursor:"pointer", fontFamily:"inherit" }}
-                onMouseEnter={e => { e.currentTarget.style.background="#ede9e4"; e.currentTarget.style.borderColor=C.border; }}
-                onMouseLeave={e => { e.currentTarget.style.background=C.surface2; e.currentTarget.style.borderColor="transparent"; }}>
-                <span style={{ fontSize:20 }}>{a.icon}</span>
-                <span style={{ fontSize:10, color:C.text, fontWeight:500, textAlign:"center", lineHeight:1.3 }}>{a.label}</span>
+              <button key={i} onClick={a.action} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8, padding:"14px 8px", background:C.surface2, border:"1px solid transparent", borderRadius:14, cursor:"pointer", fontFamily:"inherit" }}
+                onMouseEnter={e => { e.currentTarget.style.background="#ede9e4"; e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform="translateY(-2px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background=C.surface2; e.currentTarget.style.borderColor="transparent"; e.currentTarget.style.transform="none"; }}>
+                <div style={{ width:40, height:40, borderRadius:12, background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, boxShadow:"0 1px 4px rgba(0,0,0,.08)" }}>{a.icon}</div>
+                <span style={{ fontSize:10, color:C.text, fontWeight:600, textAlign:"center", lineHeight:1.3 }}>{a.label}</span>
               </button>
             ))}
           </div>
@@ -1441,7 +1441,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
         <div style={card()}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-            <span style={{ fontWeight:600, fontSize:14 }}>Planning de la semaine</span>
+            <span style={{ fontWeight:700, fontSize:14, letterSpacing:"-.01em", color:C.text }}>Planning de la semaine</span>
             <button onClick={() => onNavigate("planning")} style={{ background:"none", border:"none", color:C.blue, fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:500, padding:0 }}>Voir planning →</button>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:12 }}>
@@ -1778,7 +1778,8 @@ function RappelsPanel({ chantier, onUpdate, phases }) {
       <div style={{
         background: r.regle ? "#f0fdf4" : "#fff",
         border: `1.5px solid ${overdue ? "#ef4444" : r.regle ? "#bbf7d0" : C.border}`,
-        borderRadius: 10, padding: "10px 14px",
+        borderRadius: 14, padding: "12px 16px",
+        boxShadow: overdue ? "0 2px 8px rgba(239,68,68,.07)" : "0 1px 4px rgba(0,0,0,.05)",
         display: "flex", gap: 10, alignItems: "flex-start",
       }}>
         <button onClick={() => toggle(r.id)} style={{
@@ -2350,12 +2351,12 @@ function CalcCard({ title, children }) {
   const mob = useIsMobile();
   return (
     <div style={{
-      background: C.surface, borderRadius: 16, padding: mob ? 16 : 20,
+      background: C.surface, borderRadius: 22, padding: mob ? 18 : 26,
       border: `1px solid ${C.border}`,
-      boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04)",
+      boxShadow: "0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.04)",
       display: "flex", flexDirection: "column", gap: 14, overflow: "hidden",
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, letterSpacing: ".02em" }}>{title}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: "-.01em" }}>{title}</div>
       {children}
     </div>
   );
@@ -3584,7 +3585,7 @@ function TabPlanning({ supaChantiers }) {
     setGClientId(id); tokenClientRef.current = null; setShowSetup(false);
   };
 
-  const card = (extra={}) => ({ background:"#fff", borderRadius:16, padding:"18px 20px", border:"1px solid rgba(0,0,0,.06)", boxShadow:"0 1px 4px rgba(0,0,0,.05)", ...extra });
+  const card = (extra={}) => ({ background:"#fff", borderRadius:22, padding:"24px 28px", border:"1px solid rgba(0,0,0,.07)", boxShadow:"0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.04)", ...extra });
   const btn = (col="#0071e3", txt="#fff") => ({ background:col, color:txt, border:"none", borderRadius:10, padding:"9px 18px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", flexShrink:0 });
 
   return (
@@ -3694,7 +3695,7 @@ function TabPlanning({ supaChantiers }) {
 
       {/* Upcoming events list */}
       <div style={card()}>
-        <div style={{ fontWeight:600, fontSize:14, marginBottom:12 }}>Prochains rappels</div>
+        <div style={{ fontWeight:700, fontSize:14, marginBottom:14, letterSpacing:"-.01em", color:C.text }}>Prochains rappels</div>
         {allLocalRappels.filter(r => r.date >= todayStr).length === 0
           ? <div style={{ color:"#6d6d72", fontSize:13, textAlign:"center", padding:"20px 0" }}>Aucun rappel à venir — ajoutez des rappels depuis vos chantiers.</div>
           : <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
