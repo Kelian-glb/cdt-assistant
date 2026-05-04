@@ -91,9 +91,6 @@
       [style*="repeat(3, 1fr)"] { grid-template-columns: 1fr 1fr !important; }
       [style*="repeat(5,1fr)"] { grid-template-columns: 1fr 1fr 1fr !important; }
 
-      /* Table calculs (GO, Briques…) */
-      [style*="80px 1fr 56px 56px 72px 26px"] { grid-template-columns: 1fr 52px 52px 64px 26px !important; }
-
       /* Modal Modèles */
       .modeles-modal {
         width: calc(100vw - 24px) !important;
@@ -1812,7 +1809,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
             </div>
           ) : sel ? (
             <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
-              <div style={{ padding:"18px 22px 0" }}>
+              <div style={{ padding: mob ? "14px 14px 0" : "18px 22px 0" }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
                   <div>
                     <h2 style={{ margin:0, color:"#1a1a1a", fontSize:18, fontWeight:700 }}>{sel.client}</h2>
@@ -1840,22 +1837,22 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                   </div>
                 </div>
                 <div style={{ display:"flex", gap:0, borderBottom:`1px solid ${C.border}`, overflowX:"auto" }}>
-                  {[["infos","📋 Infos"],["budget","💶 Budget"],["checklist","✅ Checklist"],["rappels","🔔 Rappels"],["documents","📁 Documents"]].map(([id,label]) => {
+                  {[["infos","📋 Infos","📋 Infos"],["budget","💶 Budget","💶 Budget"],["checklist","✅ Checklist","✅ Check"],["rappels","🔔 Rappels","🔔 Rappels"],["documents","📁 Documents","📁 Docs"]].map(([id,label,lMob]) => {
                     const rappelsEnAttente = id==="rappels" ? (sel.rappels||[]).filter(r=>!r.regle).length : 0;
                     return (
                       <button key={id} onClick={() => setDetailTab(id)} style={{
                         background:"none", border:"none", borderBottom:`2px solid ${detailTab===id?"#1a1a1a":"transparent"}`,
-                        color: detailTab===id?"#1a1a1a":C.muted, padding:"8px 12px", fontSize:12, fontWeight:detailTab===id?600:400,
-                        cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:5, flexShrink:0, whiteSpace:"nowrap",
+                        color: detailTab===id?"#1a1a1a":C.muted, padding: mob ? "8px 7px" : "8px 12px", fontSize: mob ? 11 : 12, fontWeight:detailTab===id?600:400,
+                        cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:4, flexShrink:0, whiteSpace:"nowrap",
                       }}>
-                        {label}
+                        {mob ? lMob : label}
                         {rappelsEnAttente > 0 && <span style={{ background:"#ef4444", color:"#fff", borderRadius:99, fontSize:10, fontWeight:700, padding:"0px 5px", lineHeight:"16px" }}>{rappelsEnAttente}</span>}
                       </button>
                     );
                   })}
                 </div>
               </div>
-              <div style={{ flex:1, padding:"16px 22px 22px", overflowY:"auto" }}>
+              <div style={{ flex:1, padding: mob ? "12px 14px 14px" : "16px 22px 22px", overflowY:"auto" }}>
                 {detailTab === "infos" ? (
                   <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
                     {sel.notes && (
@@ -2819,9 +2816,9 @@ function CalcGO() {
 
         {/* liste unifiée ouvertures + poteaux */}
         <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
-        <div style={{ display:"flex", flexDirection:"column", gap:6, minWidth:380 }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:6, minWidth: mob ? undefined : 380 }}>
           {/* en-têtes */}
-          <div style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ display:"grid", gridTemplateColumns: mob ? "58px 1fr 40px 40px 68px 22px" : "80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
             {["Type","Nom","L (m)","H (m)","Qté",""].map((h,i) => (
               <span key={i} style={{ fontSize:10, fontWeight:700, color:C.muted, letterSpacing:".06em", textTransform:"uppercase", textAlign: i>=4?"center":"left" }}>{h}</span>
             ))}
@@ -2829,7 +2826,7 @@ function CalcGO() {
 
           {/* ouvertures */}
           {ouvs.map(o => (
-            <div key={o.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
+            <div key={o.id} style={{ display:"grid", gridTemplateColumns: mob ? "58px 1fr 40px 40px 68px 22px" : "80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
               <span style={{ fontSize:11, fontWeight:600, color:C.blue, background:"#dbeafe", borderRadius:6, padding:"3px 4px", textAlign:"center" }}>Ouverture</span>
               <input value={o.label} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,label:e.target.value}:x))} placeholder="Fenêtre, porte…"
                 style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
@@ -2851,7 +2848,7 @@ function CalcGO() {
 
           {/* poteaux */}
           {poteaux.map(p => (
-            <div key={p.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
+            <div key={p.id} style={{ display:"grid", gridTemplateColumns: mob ? "58px 1fr 40px 40px 68px 22px" : "80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
               <span style={{ fontSize:11, fontWeight:600, color:"#92400e", background:"#fef3c7", borderRadius:6, padding:"3px 4px", textAlign:"center" }}>Poteau</span>
               <input value={p.label} onChange={e => updPoteau(p.id,"label",e.target.value)} placeholder="Poteau…"
                 style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
@@ -3091,15 +3088,15 @@ function CalcBriques() {
 
         {/* ouvertures + poteaux */}
         <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
-        <div style={{ display:"flex", flexDirection:"column", gap:6, minWidth:380 }}>
-          <div style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:6, minWidth: mob ? undefined : 380 }}>
+          <div style={{ display:"grid", gridTemplateColumns: mob ? "58px 1fr 40px 40px 68px 22px" : "80px 1fr 56px 56px 72px 26px", gap:6, paddingBottom:4, borderBottom:`1px solid ${C.border}` }}>
             {["Type","Nom","L (m)","H (m)","Qté",""].map((h,i) => (
               <span key={i} style={{ fontSize:10, fontWeight:700, color:C.muted, letterSpacing:".06em", textTransform:"uppercase", textAlign:i>=4?"center":"left" }}>{h}</span>
             ))}
           </div>
 
           {ouvs.map(o => (
-            <div key={o.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
+            <div key={o.id} style={{ display:"grid", gridTemplateColumns: mob ? "58px 1fr 40px 40px 68px 22px" : "80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
               <span style={{ fontSize:11, fontWeight:600, color:C.blue, background:"#dbeafe", borderRadius:6, padding:"3px 4px", textAlign:"center" }}>Ouverture</span>
               <input value={o.label} onChange={e => setOuvs(p=>p.map(x=>x.id===o.id?{...x,label:e.target.value}:x))} placeholder="Fenêtre…"
                 style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
@@ -3119,7 +3116,7 @@ function CalcBriques() {
           ))}
 
           {poteaux.map(p => (
-            <div key={p.id} style={{ display:"grid", gridTemplateColumns:"80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
+            <div key={p.id} style={{ display:"grid", gridTemplateColumns: mob ? "58px 1fr 40px 40px 68px 22px" : "80px 1fr 56px 56px 72px 26px", gap:6, alignItems:"center" }}>
               <span style={{ fontSize:11, fontWeight:600, color:"#92400e", background:"#fef3c7", borderRadius:6, padding:"3px 4px", textAlign:"center" }}>Poteau</span>
               <input value={p.label} onChange={e => updPoteau(p.id,"label",e.target.value)} placeholder="Poteau…"
                 style={{ background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.text, padding:"5px 8px", fontSize:12, fontFamily:"inherit", outline:"none" }} />
