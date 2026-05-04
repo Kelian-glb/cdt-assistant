@@ -1114,10 +1114,11 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
     : 0;
 
   const allRappels = chantiers.flatMap(c => (c.rappels||[]).map(r => ({ ...r, chantierNom: c.client||c.nom, chantierId: c.id })));
-  const rappelsRetard = allRappels.filter(r => !r.regle && r.date && r.date < today).sort((a,b) => a.date.localeCompare(b.date));
+  const rappelsRetard = allRappels.filter(r => !r.regle && r.date && r.date <= today).sort((a,b) => a.date.localeCompare(b.date));
+  const rappelsSansDate = allRappels.filter(r => !r.regle && !r.date);
   const in7 = new Date(); in7.setDate(in7.getDate() + 7);
   const in7str = in7.toISOString().split("T")[0];
-  const rappelsBientot = allRappels.filter(r => !r.regle && r.date && r.date >= today && r.date <= in7str).sort((a,b) => a.date.localeCompare(b.date));
+  const rappelsBientot = allRappels.filter(r => !r.regle && r.date && r.date > today && r.date <= in7str).sort((a,b) => a.date.localeCompare(b.date));
   const todayRappels   = allRappels.filter(r => !r.regle && r.date === today);
 
   const score = Math.min(100, Math.max(0, 65 + (enCours>0?8:0) + (termines>0?7:0) - (bloques*20) - (rappelsRetard.length*5) + (avgPct>50?10:0)));
@@ -1127,10 +1128,13 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 
   const alertes = [
     ...rappelsRetard.slice(0,2).map(r => ({ icon:"⚠️", title:r.chantierNom, desc:r.texte, color:C.orange })),
+    ...(rappelsSansDate.length > 0 && rappelsRetard.length < 2
+      ? rappelsSansDate.slice(0, 2 - rappelsRetard.length).map(r => ({ icon:"🔔", title:r.chantierNom, desc:r.texte, color:C.blue }))
+      : []),
     ...(bloques > 0 ? [{ icon:"🔴", title:`${bloques} chantier${bloques>1?"s":""} bloqué${bloques>1?"s":""}`, desc:"Action requise", color:C.red }] : []),
   ].slice(0,3);
 
-  const prochaineAction = rappelsBientot[0] || rappelsRetard[0];
+  const prochaineAction = rappelsBientot[0] || rappelsRetard[0] || rappelsSansDate[0];
 
   const chartData = (() => {
     const mois = ["jan.","fév.","mar.","avr.","mai","juin","juil.","août","sep.","oct.","nov.","déc."];
