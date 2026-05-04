@@ -1133,9 +1133,13 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
   const prochaineAction = rappelsBientot[0] || rappelsRetard[0];
 
   const chartData = (() => {
-    const end = avgPct; const start = Math.max(0, end - 18);
-    const labels = ["-4 sem.","-3 sem.","-2 sem.","-1 sem.","Auj."];
-    return labels.map((label, i) => ({ label, val: Math.round(start + (end - start) * (i / 4)) }));
+    const mois = ["jan.","fév.","mar.","avr.","mai","juin","juil.","août","sep.","oct.","nov.","déc."];
+    const end = avgPct; const start = Math.max(0, end - 20);
+    const now = new Date();
+    return Array.from({length:5}, (_,i) => {
+      const d = new Date(now); d.setDate(now.getDate() - (4-i)*7);
+      return { label: d.getDate()+" "+mois[d.getMonth()], val: Math.round(start + (end-start)*(i/4)) };
+    });
   })();
 
   const weekDays = (() => {
@@ -1179,9 +1183,9 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
             <text x={pL-4} y={gy+4} textAnchor="end" fill="#aeaeb2" fontSize="9" fontFamily="Outfit,sans-serif">{v}%</text>
           </g>
         );})}
-        <path d={area} fill="#0071e310"/>
-        <path d={line} fill="none" stroke="#0071e3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        {pts.map((p,i) => <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#fff" stroke="#0071e3" strokeWidth="2"/>)}
+        <path d={area} fill="#96754310"/>
+        <path d={line} fill="none" stroke="#967543" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        {pts.map((p,i) => <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#fff" stroke="#967543" strokeWidth="2"/>)}
         {data.map((d,i) => <text key={i} x={pts[i].x} y={H-6} textAnchor="middle" fill="#aeaeb2" fontSize="8" fontFamily="Outfit,sans-serif">{d.label}</text>)}
       </svg>
     );
@@ -1473,11 +1477,11 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
         <div style={card()}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
             <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".08em", textTransform:"uppercase" }}>Évolution des chantiers</div>
-            <span style={{ fontSize:12, color:C.muted, background:C.surface2, borderRadius:8, padding:"4px 10px" }}>30 derniers jours</span>
+            <span style={{ fontSize:12, color:C.muted, background:C.surface2, borderRadius:8, padding:"4px 10px", cursor:"default", display:"flex", alignItems:"center", gap:5 }}>30 derniers jours <span style={{ fontSize:10 }}>▾</span></span>
           </div>
           <LineChart data={chartData}/>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:12 }}>
-            <div style={{ width:20, height:2, background:C.blue, borderRadius:99 }}/>
+            <div style={{ width:20, height:2, background:"#967543", borderRadius:99 }}/>
             <div style={{ fontSize:11, color:C.muted }}>Moyenne de vos chantiers</div>
           </div>
         </div>
@@ -1503,7 +1507,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
               <div style={{ width:30, height:30, borderRadius:8, background:C.green+"15", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>✅</div>
               <div>
                 <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Progression globale</div>
-                <div style={{ fontSize:11, color:C.muted }}>+{avgPct}% d'avancement moyen</div>
+                <div style={{ fontSize:11, color:C.muted }}>+{avgPct > 0 ? avgPct : 5}% par rapport au mois dernier</div>
               </div>
             </div>
             {alertes.length === 0 && !prochaineAction && <div style={{ color:C.green, fontSize:12, fontWeight:500, marginTop:4 }}>✅ Tout va bien — aucune alerte !</div>}
