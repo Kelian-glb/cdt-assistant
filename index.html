@@ -385,19 +385,31 @@ function useSupaSettings(userId) {
 // ── Hook Logos ──────────────────────────────────────────────────────────────
 function useSupaLogos(userId) {
   const [logos, setLogos] = useState([]);
+  const [defaultLogoId, setDefaultLogoId] = useState(null);
 
   useEffect(() => {
     if (!userId) return;
     supabase.from("user_settings").select("logos").eq("user_id", userId).maybeSingle()
-      .then(({ data }) => setLogos(data?.logos || []));
+      .then(({ data }) => {
+        const raw = data?.logos;
+        if (Array.isArray(raw)) {
+          setLogos(raw);
+        } else if (raw && typeof raw === "object") {
+          setLogos(raw.items || []);
+          setDefaultLogoId(raw.defaultId ?? null);
+        } else {
+          setLogos([]);
+        }
+      });
   }, [userId]);
 
-  const _upsert = async (newLogos) => {
+  const _upsert = async (newLogos, newDefaultId) => {
+    const payload = { items: newLogos, defaultId: newDefaultId };
     const { data: existing } = await supabase.from("user_settings").select("id").eq("user_id", userId).maybeSingle();
     if (existing) {
-      await supabase.from("user_settings").update({ logos: newLogos, updated_at: new Date().toISOString() }).eq("user_id", userId);
+      await supabase.from("user_settings").update({ logos: payload, updated_at: new Date().toISOString() }).eq("user_id", userId);
     } else {
-      await supabase.from("user_settings").insert({ logos: newLogos, user_id: userId });
+      await supabase.from("user_settings").insert({ logos: payload, user_id: userId });
     }
   };
 
@@ -405,17 +417,24 @@ function useSupaLogos(userId) {
     const newLogo = { id: Date.now(), name, dataUrl };
     const updated = [...logos, newLogo];
     setLogos(updated);
-    await _upsert(updated);
+    await _upsert(updated, defaultLogoId);
     return newLogo;
   };
 
   const deleteLogo = async (id) => {
     const updated = logos.filter(l => l.id !== id);
     setLogos(updated);
-    await _upsert(updated);
+    const newDefault = defaultLogoId === id ? null : defaultLogoId;
+    setDefaultLogoId(newDefault);
+    await _upsert(updated, newDefault);
   };
 
-  return { logos, saveLogo, deleteLogo };
+  const saveDefaultLogo = async (id) => {
+    setDefaultLogoId(id);
+    await _upsert(logos, id);
+  };
+
+  return { logos, defaultLogoId, saveLogo, deleteLogo, saveDefaultLogo };
 }
 
 // ── Hook Entreprise ─────────────────────────────────────────────────────────
@@ -2542,8 +2561,22 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   // ── Logos sauvegardés (Supabase user_settings) ──
   const savedLogos = supaLogos?.logos || [];
 
+  // Auto-sélection du logo par défaut sauvegardé (prioritaire sur entreprise.logo_url)
+  useEffect(() => {
+    if (!supaLogos?.defaultLogoId || !savedLogos.length) return;
+    const defaultLogo = savedLogos.find(l => l.id === supaLogos.defaultLogoId);
+    if (defaultLogo) setPv(p => ({ ...p, logoUrl: defaultLogo.dataUrl }));
+  }, [supaLogos?.defaultLogoId, savedLogos.length]);
+
   const uploadLogo = async (name, dataUrl) => {
-    await supaLogos?.saveLogo(name, dataUrl);
+    const newLogo = await supaLogos?.saveLogo(name, dataUrl);
+    if (newLogo) await supaLogos?.saveDefaultLogo(newLogo.id);
+    setPv(p => ({ ...p, logoUrl: dataUrl }));
+  };
+
+  const selectLogo = async (dataUrl) => {
+    const logo = savedLogos.find(l => l.dataUrl === dataUrl);
+    if (logo) await supaLogos?.saveDefaultLogo(logo.id);
     setPv(p => ({ ...p, logoUrl: dataUrl }));
   };
 
@@ -2806,7 +2839,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
             <LogoPicker
               logos={savedLogos}
               selectedUrl={pv.logoUrl}
-              onSelect={url => setPv(p=>({...p,logoUrl:url}))}
+              onSelect={selectLogo}
               onUpload={uploadLogo}
               onDelete={deleteLogo}
             />
