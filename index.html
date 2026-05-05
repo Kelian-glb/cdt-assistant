@@ -385,31 +385,25 @@ function useSupaSettings(userId) {
 // ── Hook Logos ──────────────────────────────────────────────────────────────
 function useSupaLogos(userId) {
   const [logos, setLogos] = useState([]);
-  const [defaultLogoId, setDefaultLogoId] = useState(null);
+  const [defaultLogoId, setDefaultLogoId] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pv_default_logo_id")); } catch { return null; }
+  });
 
   useEffect(() => {
     if (!userId) return;
     supabase.from("user_settings").select("logos").eq("user_id", userId).maybeSingle()
       .then(({ data }) => {
         const raw = data?.logos;
-        if (Array.isArray(raw)) {
-          setLogos(raw);
-        } else if (raw && typeof raw === "object") {
-          setLogos(raw.items || []);
-          setDefaultLogoId(raw.defaultId ?? null);
-        } else {
-          setLogos([]);
-        }
+        setLogos(Array.isArray(raw) ? raw : []);
       });
   }, [userId]);
 
-  const _upsert = async (newLogos, newDefaultId) => {
-    const payload = { items: newLogos, defaultId: newDefaultId };
+  const _upsert = async (newLogos) => {
     const { data: existing } = await supabase.from("user_settings").select("id").eq("user_id", userId).maybeSingle();
     if (existing) {
-      await supabase.from("user_settings").update({ logos: payload, updated_at: new Date().toISOString() }).eq("user_id", userId);
+      await supabase.from("user_settings").update({ logos: newLogos, updated_at: new Date().toISOString() }).eq("user_id", userId);
     } else {
-      await supabase.from("user_settings").insert({ logos: payload, user_id: userId });
+      await supabase.from("user_settings").insert({ logos: newLogos, user_id: userId });
     }
   };
 
@@ -417,21 +411,23 @@ function useSupaLogos(userId) {
     const newLogo = { id: Date.now(), name, dataUrl };
     const updated = [...logos, newLogo];
     setLogos(updated);
-    await _upsert(updated, defaultLogoId);
+    await _upsert(updated);
     return newLogo;
   };
 
   const deleteLogo = async (id) => {
     const updated = logos.filter(l => l.id !== id);
     setLogos(updated);
-    const newDefault = defaultLogoId === id ? null : defaultLogoId;
-    setDefaultLogoId(newDefault);
-    await _upsert(updated, newDefault);
+    if (defaultLogoId === id) {
+      setDefaultLogoId(null);
+      localStorage.removeItem("pv_default_logo_id");
+    }
+    await _upsert(updated);
   };
 
-  const saveDefaultLogo = async (id) => {
+  const saveDefaultLogo = (id) => {
     setDefaultLogoId(id);
-    await _upsert(logos, id);
+    localStorage.setItem("pv_default_logo_id", JSON.stringify(id));
   };
 
   return { logos, defaultLogoId, saveLogo, deleteLogo, saveDefaultLogo };
