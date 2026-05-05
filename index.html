@@ -385,49 +385,45 @@ function useSupaSettings(userId) {
 // ── Hook Logos ──────────────────────────────────────────────────────────────
 function useSupaLogos(userId) {
   const [logos, setLogos] = useState([]);
-  const [defaultLogoId, setDefaultLogoId] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("pv_default_logo_id")); } catch { return null; }
-  });
+  const [defaultLogoId, setDefaultLogoId] = useState(null);
 
+  // Chargement depuis localStorage dès que l'userId est disponible
   useEffect(() => {
     if (!userId) return;
-    supabase.from("user_settings").select("logos").eq("user_id", userId).maybeSingle()
-      .then(({ data }) => {
-        const raw = data?.logos;
-        setLogos(Array.isArray(raw) ? raw : []);
-      });
+    try {
+      const raw = localStorage.getItem(`logos_${userId}`);
+      if (raw) setLogos(JSON.parse(raw));
+      const defRaw = localStorage.getItem(`logo_default_${userId}`);
+      if (defRaw) setDefaultLogoId(JSON.parse(defRaw));
+    } catch {}
   }, [userId]);
 
-  const _upsert = async (newLogos) => {
-    const { data: existing } = await supabase.from("user_settings").select("id").eq("user_id", userId).maybeSingle();
-    if (existing) {
-      await supabase.from("user_settings").update({ logos: newLogos, updated_at: new Date().toISOString() }).eq("user_id", userId);
-    } else {
-      await supabase.from("user_settings").insert({ logos: newLogos, user_id: userId });
-    }
+  const _persist = (newLogos) => {
+    if (!userId) return;
+    try { localStorage.setItem(`logos_${userId}`, JSON.stringify(newLogos)); } catch {}
   };
 
   const saveLogo = async (name, dataUrl) => {
     const newLogo = { id: Date.now(), name, dataUrl };
     const updated = [...logos, newLogo];
     setLogos(updated);
-    await _upsert(updated);
+    _persist(updated);
     return newLogo;
   };
 
   const deleteLogo = async (id) => {
     const updated = logos.filter(l => l.id !== id);
     setLogos(updated);
+    _persist(updated);
     if (defaultLogoId === id) {
       setDefaultLogoId(null);
-      localStorage.removeItem("pv_default_logo_id");
+      try { localStorage.removeItem(`logo_default_${userId}`); } catch {}
     }
-    await _upsert(updated);
   };
 
   const saveDefaultLogo = (id) => {
     setDefaultLogoId(id);
-    localStorage.setItem("pv_default_logo_id", JSON.stringify(id));
+    try { localStorage.setItem(`logo_default_${userId}`, JSON.stringify(id)); } catch {}
   };
 
   return { logos, defaultLogoId, saveLogo, deleteLogo, saveDefaultLogo };
