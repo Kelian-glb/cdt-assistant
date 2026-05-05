@@ -3576,6 +3576,124 @@ function CalcBriques() {
   );
 }
 
+// ── SCHEMAS TOITURE SVG ───────────────────────────────────────────────────
+function SchemaToiture({ type }) {
+  const box = { background:"#f5f4f0", borderRadius:8, padding:"6px 10px", border:`1px solid ${C.border}` };
+  if (type === "Mono pente") return (
+    <div style={box}>
+      <svg viewBox="0 0 240 100" style={{width:"100%",maxWidth:260,display:"block",margin:"0 auto"}}>
+        <text x="120" y="10" fontSize="7.5" fill="#888" textAnchor="middle">Vue latérale — mono pente</text>
+        <polygon points="25,22 215,80 215,90 25,90" fill="#c8a07a" stroke="#8a6040" strokeWidth="1.5"/>
+        <line x1="25" y1="22" x2="25" y2="90" stroke="#8a6040" strokeWidth="1.5"/>
+        <line x1="15" y1="90" x2="225" y2="90" stroke="#666" strokeWidth="1"/>
+        <line x1="11" y1="22" x2="11" y2="90" stroke="#555" strokeWidth="1"/>
+        <line x1="8" y1="22" x2="14" y2="22" stroke="#555" strokeWidth="1"/>
+        <line x1="8" y1="90" x2="14" y2="90" stroke="#555" strokeWidth="1"/>
+        <text x="4" y="58" fontSize="9" fill="#555" textAnchor="middle">h</text>
+        <line x1="25" y1="97" x2="215" y2="97" stroke="#555" strokeWidth="1"/>
+        <line x1="25" y1="94" x2="25" y2="100" stroke="#555" strokeWidth="1"/>
+        <line x1="215" y1="94" x2="215" y2="100" stroke="#555" strokeWidth="1"/>
+        <text x="120" y="100" fontSize="8" fill="#555" textAnchor="middle">l (portée totale)</text>
+        <text x="110" y="48" fontSize="8" fill="#6a3a1a" textAnchor="middle" transform="rotate(-17,110,48)">rampant</text>
+        <text x="120" y="84" fontSize="7.5" fill="#fff" textAnchor="middle" fontWeight="600">surface = L × rampant</text>
+      </svg>
+    </div>
+  );
+  if (type === "4 pans") return (
+    <div style={box}>
+      <svg viewBox="0 0 240 115" style={{width:"100%",maxWidth:280,display:"block",margin:"0 auto"}}>
+        <text x="120" y="9" fontSize="7.5" fill="#888" textAnchor="middle">Vue de dessus — 4 pans</text>
+        <polygon points="20,13 80,55 160,55 220,13" fill="#c8a07a" stroke="#8a6040" strokeWidth="1.5"/>
+        <polygon points="20,103 80,60 160,60 220,103" fill="#b89060" stroke="#8a6040" strokeWidth="1.5"/>
+        <polygon points="20,13 80,58 20,103" fill="#d4b08a" stroke="#8a6040" strokeWidth="1.5"/>
+        <polygon points="220,13 160,58 220,103" fill="#a07850" stroke="#8a6040" strokeWidth="1.5"/>
+        <rect x="20" y="13" width="200" height="90" fill="none" stroke="#aaa" strokeWidth="1" strokeDasharray="3,2"/>
+        <line x1="20" y1="13" x2="80" y2="58" stroke="#604020" strokeWidth="1.5" strokeDasharray="5,3"/>
+        <line x1="220" y1="13" x2="160" y2="58" stroke="#604020" strokeWidth="1.5" strokeDasharray="5,3"/>
+        <line x1="20" y1="103" x2="80" y2="58" stroke="#604020" strokeWidth="1.5" strokeDasharray="5,3"/>
+        <line x1="220" y1="103" x2="160" y2="58" stroke="#604020" strokeWidth="1.5" strokeDasharray="5,3"/>
+        <line x1="80" y1="58" x2="160" y2="58" stroke="#e06030" strokeWidth="3"/>
+        <text x="120" y="55" fontSize="8" fill="#e06030" textAnchor="middle" fontWeight="600">faîtage</text>
+        <text x="120" y="30" fontSize="8" fill="#6a3a1a" textAnchor="middle">rampant</text>
+        <text x="120" y="88" fontSize="8" fill="#6a3a1a" textAnchor="middle">rampant</text>
+        <text x="42" y="34" fontSize="7" fill="#604020" textAnchor="middle" transform="rotate(-46,42,34)">arêtier</text>
+        <line x1="20" y1="107" x2="220" y2="107" stroke="#555" strokeWidth="1"/>
+        <text x="120" y="113" fontSize="8" fill="#555" textAnchor="middle">L (longueur)</text>
+        <line x1="224" y1="13" x2="224" y2="103" stroke="#555" strokeWidth="1"/>
+        <text x="234" y="60" fontSize="8" fill="#555" textAnchor="middle">l</text>
+      </svg>
+    </div>
+  );
+  return (
+    <div style={box}>
+      <svg viewBox="0 0 240 110" style={{width:"100%",maxWidth:260,display:"block",margin:"0 auto"}}>
+        <text x="120" y="9" fontSize="7.5" fill="#888" textAnchor="middle">Vue de face — 2 pans</text>
+        <polygon points="20,88 120,26 120,88" fill="#c8a07a" stroke="#8a6040" strokeWidth="1.5"/>
+        <polygon points="120,88 220,88 120,26" fill="#b89060" stroke="#8a6040" strokeWidth="1.5"/>
+        <line x1="15" y1="88" x2="225" y2="88" stroke="#666" strokeWidth="1"/>
+        <circle cx="120" cy="26" r="3" fill="#e06030"/>
+        <line x1="120" y1="26" x2="120" y2="88" stroke="#999" strokeWidth="1" strokeDasharray="4,3"/>
+        <text x="72" y="62" fontSize="8" fill="#6a3a1a" textAnchor="middle" transform="rotate(-34,72,62)">rampant</text>
+        <text x="168" y="62" fontSize="8" fill="#6a3a1a" textAnchor="middle" transform="rotate(34,168,62)">rampant</text>
+        <text x="132" y="60" fontSize="9" fill="#555">h</text>
+        <line x1="20" y1="98" x2="220" y2="98" stroke="#555" strokeWidth="1"/>
+        <line x1="20" y1="95" x2="20" y2="101" stroke="#555" strokeWidth="1"/>
+        <line x1="220" y1="95" x2="220" y2="101" stroke="#555" strokeWidth="1"/>
+        <text x="120" y="107" fontSize="8" fill="#555" textAnchor="middle">l (largeur)</text>
+        <text x="120" y="20" fontSize="8" fill="#e06030" textAnchor="middle" fontWeight="600">faîtage (longueur L)</text>
+        <text x="70" y="82" fontSize="7.5" fill="#8a5030" textAnchor="middle">pan G</text>
+        <text x="170" y="82" fontSize="7.5" fill="#8a5030" textAnchor="middle">pan D</text>
+      </svg>
+    </div>
+  );
+}
+
+function SchemaFaitage() {
+  const box = { background:"#f5f4f0", borderRadius:8, padding:"6px 10px", border:`1px solid ${C.border}` };
+  return (
+    <div style={box}>
+      <svg viewBox="0 0 240 75" style={{width:"100%",maxWidth:260,display:"block",margin:"0 auto"}}>
+        <text x="120" y="9" fontSize="7.5" fill="#888" textAnchor="middle">Vue de dessus — faîtage en orange</text>
+        <rect x="20" y="14" width="200" height="52" fill="#e0d0be" stroke="#aaa" strokeWidth="1" strokeDasharray="4,2"/>
+        <line x1="20" y1="14" x2="220" y2="66" stroke="#ccc" strokeWidth="0.5"/>
+        <line x1="220" y1="14" x2="20" y2="66" stroke="#ccc" strokeWidth="0.5"/>
+        <line x1="20" y1="40" x2="220" y2="40" stroke="#e06030" strokeWidth="3"/>
+        <text x="120" y="37" fontSize="8" fill="#e06030" textAnchor="middle" fontWeight="600">faîtage</text>
+        <line x1="20" y1="6" x2="220" y2="6" stroke="#e06030" strokeWidth="1"/>
+        <line x1="20" y1="3" x2="20" y2="9" stroke="#e06030" strokeWidth="1"/>
+        <line x1="220" y1="3" x2="220" y2="9" stroke="#e06030" strokeWidth="1"/>
+        <text x="120" y="5" fontSize="8" fill="#e06030" textAnchor="middle" fontWeight="600">← L du faîtage →</text>
+        <text x="65" y="56" fontSize="7.5" fill="#8a5030" textAnchor="middle">pan G (nord)</text>
+        <text x="175" y="28" fontSize="7.5" fill="#8a5030" textAnchor="middle">pan D (sud)</text>
+      </svg>
+    </div>
+  );
+}
+
+function SchemaRive() {
+  const box = { background:"#f5f4f0", borderRadius:8, padding:"6px 10px", border:`1px solid ${C.border}` };
+  return (
+    <div style={box}>
+      <svg viewBox="0 0 240 105" style={{width:"100%",maxWidth:260,display:"block",margin:"0 auto"}}>
+        <text x="120" y="9" fontSize="7.5" fill="#888" textAnchor="middle">Vue de face — rives pignon</text>
+        <polygon points="20,83 120,22 220,83" fill="#e8ddd0" stroke="#ccc" strokeWidth="1"/>
+        <line x1="15" y1="83" x2="225" y2="83" stroke="#aaa" strokeWidth="1"/>
+        <line x1="20" y1="83" x2="120" y2="22" stroke="#3a7fd4" strokeWidth="4" strokeLinecap="round"/>
+        <line x1="220" y1="83" x2="120" y2="22" stroke="#e06030" strokeWidth="4" strokeLinecap="round"/>
+        <text x="60" y="50" fontSize="9" fill="#3a7fd4" fontWeight="700" textAnchor="middle" transform="rotate(-34,60,50)">Rive G</text>
+        <text x="180" y="50" fontSize="9" fill="#e06030" fontWeight="700" textAnchor="middle" transform="rotate(34,180,50)">Rive D</text>
+        <text x="60" y="63" fontSize="7.5" fill="#3a7fd4" textAnchor="middle" transform="rotate(-34,60,63)">= rampant</text>
+        <text x="180" y="63" fontSize="7.5" fill="#e06030" textAnchor="middle" transform="rotate(34,180,63)">= rampant</text>
+        <rect x="4" y="81" width="60" height="14" rx="4" fill="#e8f0fa"/>
+        <text x="34" y="91" fontSize="8" fill="#3a7fd4" textAnchor="middle" fontWeight="600">Rive gauche</text>
+        <rect x="176" y="81" width="60" height="14" rx="4" fill="#fdf0ea"/>
+        <text x="206" y="91" fontSize="8" fill="#e06030" textAnchor="middle" fontWeight="600">Rive droite</text>
+        <text x="120" y="103" fontSize="7.5" fill="#888" textAnchor="middle">Chaque rive = 1 ligne de tuiles le long du rampant</text>
+      </svg>
+    </div>
+  );
+}
+
 // ── CHARPENTE / COUVERTURE ─────────────────────────────────────────────────
 function CalcCharpente() {
   // Tuiles
@@ -3698,6 +3816,7 @@ function CalcCharpente() {
         <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
           Densité : <strong style={{ color:"#1a1a1a" }}>{TUILES[typeTuile].u_m2} u/m²</strong> · {TUILES[typeTuile].pal} u/palette
         </div>
+        <SchemaToiture type={typeToiture} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           <Input label={typeToiture === "2 pans" ? "Longueur faîtière (m)" : "Longueur hors tout (m)"} value={vTuile.L||""} onChange={v => setVTuile(p=>({...p,L:v}))} type="number" placeholder="10" />
           <Input label={typeToiture === "Mono pente" ? "Largeur / portée (m)" : "Largeur hors tout (m)"} value={vTuile.l||""} onChange={v => setVTuile(p=>({...p,l:v}))} type="number" placeholder="8" />
@@ -3717,6 +3836,7 @@ function CalcCharpente() {
           <Input label="Longueur du faîtage (m)" value={vFait.L||""} onChange={v => setVFait(p=>({...p,L:v}))} type="number" placeholder="10" />
           <Input label="Pièces par mètre linéaire" value={vFait.pml||""} onChange={v => setVFait(p=>({...p,pml:v}))} type="number" placeholder="3 (canal) / 4 (méca)" />
         </div>
+        <SchemaFaitage />
         <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
           Tuile canal ≈ <strong style={{color:"#1a1a1a"}}>3 u/ml</strong> · Tuile mécanique ≈ <strong style={{color:"#1a1a1a"}}>4 u/ml</strong>
         </div>
@@ -3728,6 +3848,7 @@ function CalcCharpente() {
         <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}`, marginBottom:4 }}>
           Les champs sont pré-remplis depuis « Tuiles courantes ». Tu peux les modifier si ce toit de rive a des dimensions différentes.
         </div>
+        <SchemaRive />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <Input label="Largeur hors tout (m) — si différente" value={vRive.l||""} onChange={v => setVRive(p=>({...p,l:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
           <Input label="Pente (%) — si différente" value={vRive.pente||""} onChange={v => setVRive(p=>({...p,pente:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
