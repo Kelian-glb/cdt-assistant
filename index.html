@@ -3637,6 +3637,17 @@ function CalcCharpente() {
   // Tuiles de rive gauche / droite
   const [vRive, setVRive] = useState({});
   const [resRive, setResRive] = useState(null);
+
+  // Sync automatique : tuiles courantes → faîtières et rives
+  useEffect(() => { if (vTuile.L !== undefined) setVFait(p => ({ ...p, L: vTuile.L })); }, [vTuile.L]);
+  useEffect(() => {
+    setVRive(p => ({
+      ...p,
+      ...(vTuile.l     !== undefined ? { l:     vTuile.l     } : {}),
+      ...(vTuile.pente !== undefined ? { pente: vTuile.pente } : {}),
+    }));
+  }, [vTuile.l, vTuile.pente]);
+
   const calcRive = () => {
     const lRef = parseFloat(vTuile.l||vRive.l||0);
     const penteRef = parseFloat(vTuile.pente||vRive.pente||0);
@@ -3714,7 +3725,7 @@ function CalcCharpente() {
 
       <CalcCard title="Tuiles de rive (gauche & droite)">
         <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}`, marginBottom:4 }}>
-          Si tu as déjà renseigné la largeur et le % de pente dans « Tuiles courantes », la longueur du rampant est reprise automatiquement.
+          Les champs sont pré-remplis depuis « Tuiles courantes ». Tu peux les modifier si ce toit de rive a des dimensions différentes.
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <Input label="Largeur hors tout (m) — si différente" value={vRive.l||""} onChange={v => setVRive(p=>({...p,l:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
