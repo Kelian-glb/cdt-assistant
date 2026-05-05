@@ -3663,8 +3663,9 @@ function CalcCharpente() {
     const nbParRive = Math.ceil(Lr * pml * 1.05);
     setResRive({
       "Longueur rampant": `${Lr.toFixed(2)} m`,
-      "Tuiles rive / côté +5%": `${nbParRive} u`,
-      "Total rive gauche + droite": `${nbParRive * 2} u (× 2 pans)`,
+      "Rive gauche (+5% casse)": `${nbParRive} u`,
+      "Rive droite (+5% casse)": `${nbParRive} u`,
+      "Total à commander": `${nbParRive * 2} u`,
     });
   };
 
@@ -3735,7 +3736,7 @@ function CalcCharpente() {
         </div>
         <button onClick={calcRive} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
         <ResultBox result={resRive} />
-        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ +5% casse inclus. Résultat donné par rive puis total gauche + droite.</div>
+        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ Rive gauche et rive droite ont la même longueur de rampant sur une toiture symétrique. +5% casse inclus.</div>
       </CalcCard>
 
       <CalcCard title="Génoise (tuiles canal)">
