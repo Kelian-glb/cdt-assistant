@@ -3587,20 +3587,36 @@ function CalcCharpente() {
     "Ardoise (25 u/m²)":         { u_m2: 25, pal: 300 },
   };
   const [typeTuile, setTypeTuile] = useState("Tuile canal (30 u/m²)");
+  const [typeToiture, setTypeToiture] = useState("2 pans");
   const [vTuile, setVTuile] = useState({});
   const [resTuile, setResTuile] = useState(null);
   const calcTuile = () => {
     const f = TUILES[typeTuile];
-    // Toiture 2 pans
     const L = parseFloat(vTuile.L||0), l = parseFloat(vTuile.l||0), pente = parseFloat(vTuile.pente||0);
-    const h = (pente / 100) * (l / 2);
-    const ramp = Math.sqrt((l/2)**2 + h**2);
-    const surf = 2 * L * ramp;
+    let h, ramp, surf, extra = {};
+    if (typeToiture === "Mono pente") {
+      h = (pente / 100) * l;
+      ramp = Math.sqrt(l**2 + h**2);
+      surf = L * ramp;
+      extra = { "Hauteur calculée": `${h.toFixed(2)} m`, "Longueur rampant": `${ramp.toFixed(2)} m` };
+    } else if (typeToiture === "4 pans") {
+      h = (pente / 100) * (l / 2);
+      ramp = Math.sqrt((l/2)**2 + h**2);
+      const arêtier = Math.sqrt((l/2)**2 + (l/2)**2 + h**2);
+      const faitage = Math.max(0, L - l);
+      surf = 2 * L * ramp;
+      extra = { "Hauteur de faîtage calculée": `${h.toFixed(2)} m`, "Longueur rampant": `${ramp.toFixed(2)} m`, "Longueur du faîtage": `${faitage.toFixed(2)} m`, "Longueur arêtier": `${arêtier.toFixed(2)} m` };
+    } else {
+      h = (pente / 100) * (l / 2);
+      ramp = Math.sqrt((l/2)**2 + h**2);
+      surf = 2 * L * ramp;
+      extra = { "Hauteur de faîtage calculée": `${h.toFixed(2)} m`, "Longueur rampant": `${ramp.toFixed(2)} m` };
+    }
     const qNet = Math.ceil(surf * f.u_m2);
     const qTot = Math.ceil(qNet * 1.05);
     const palEnt = Math.floor(qTot / f.pal), palRest = qTot % f.pal;
     const palLabel = palRest > 0 ? `${palEnt} pal. + ${palRest} u` : `${palEnt} palette${palEnt>1?"s":""} pile`;
-    setResTuile({ "Hauteur de faîtage calculée": `${h.toFixed(2)} m`, "Longueur rampant": `${ramp.toFixed(2)} m`, "Surface toiture": `${surf.toFixed(2)} m²`, "Tuiles nettes": `${qNet} u`, "Tuiles +5% casse": `${qTot} u`, [`Palettes (${f.pal} u/pal)`]: palLabel });
+    setResTuile({ ...extra, "Surface toiture": `${surf.toFixed(2)} m²`, "Tuiles nettes": `${qNet} u`, "Tuiles +5% casse": `${qTot} u`, [`Palettes (${f.pal} u/pal)`]: palLabel });
   };
 
   // Faîtières
@@ -3624,8 +3640,12 @@ function CalcCharpente() {
   const calcRive = () => {
     const lRef = parseFloat(vTuile.l||vRive.l||0);
     const penteRef = parseFloat(vTuile.pente||vRive.pente||0);
-    const hRef = (penteRef / 100) * (lRef / 2);
-    const rampCalc = lRef ? Math.sqrt((lRef/2)**2 + hRef**2) : 0;
+    const hRef = typeToiture === "Mono pente"
+      ? (penteRef / 100) * lRef
+      : (penteRef / 100) * (lRef / 2);
+    const rampCalc = lRef
+      ? (typeToiture === "Mono pente" ? Math.sqrt(lRef**2 + hRef**2) : Math.sqrt((lRef/2)**2 + hRef**2))
+      : 0;
     const ramp = rampCalc || parseFloat(vRive.ramp||0);
     const Lr = ramp || parseFloat(vRive.ramp||0);
     const pml = parseFloat(vRive.pml||4); // pièces par mètre linéaire (tuile mécanique ≈ 4/ml)
@@ -3659,18 +3679,25 @@ function CalcCharpente() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
       <CalcCard title="Tuiles courantes — Quantité & Palettes">
-        <Select label="Type de tuile" value={typeTuile} onChange={v => { setTypeTuile(v); setResTuile(null); }} options={Object.keys(TUILES)} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Select label="Type de toiture" value={typeToiture} onChange={v => { setTypeToiture(v); setResTuile(null); }} options={["2 pans", "4 pans", "Mono pente"]} />
+          <Select label="Type de tuile" value={typeTuile} onChange={v => { setTypeTuile(v); setResTuile(null); }} options={Object.keys(TUILES)} />
+        </div>
         <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}` }}>
           Densité : <strong style={{ color:"#1a1a1a" }}>{TUILES[typeTuile].u_m2} u/m²</strong> · {TUILES[typeTuile].pal} u/palette
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          <Input label="Longueur faîtière (m)" value={vTuile.L||""} onChange={v => setVTuile(p=>({...p,L:v}))} type="number" placeholder="10" />
-          <Input label="Largeur hors tout (m)" value={vTuile.l||""} onChange={v => setVTuile(p=>({...p,l:v}))} type="number" placeholder="8" />
+          <Input label={typeToiture === "2 pans" ? "Longueur faîtière (m)" : "Longueur hors tout (m)"} value={vTuile.L||""} onChange={v => setVTuile(p=>({...p,L:v}))} type="number" placeholder="10" />
+          <Input label={typeToiture === "Mono pente" ? "Largeur / portée (m)" : "Largeur hors tout (m)"} value={vTuile.l||""} onChange={v => setVTuile(p=>({...p,l:v}))} type="number" placeholder="8" />
           <Input label="Pente (%)" value={vTuile.pente||""} onChange={v => setVTuile(p=>({...p,pente:v}))} type="number" placeholder="35" />
         </div>
         <button onClick={calcTuile} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
         <ResultBox result={resTuile} />
-        <div style={{ color:C.muted, fontSize:11 }}>ℹ️ Toiture 2 pans. +5% casse inclus.</div>
+        <div style={{ color:C.muted, fontSize:11 }}>
+          {typeToiture === "2 pans" && "ℹ️ Toiture 2 pans symétrique. +5% casse inclus."}
+          {typeToiture === "4 pans" && "ℹ️ Toiture 4 pans (croupe). Surface = 2 × L × rampant — identique au 2 pans à dimensions égales. +5% casse inclus."}
+          {typeToiture === "Mono pente" && "ℹ️ Toiture mono pente. La pente couvre toute la largeur. +5% casse inclus."}
+        </div>
       </CalcCard>
 
       <CalcCard title="Tuiles faîtières">
