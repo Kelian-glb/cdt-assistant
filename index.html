@@ -3592,14 +3592,15 @@ function CalcCharpente() {
   const calcTuile = () => {
     const f = TUILES[typeTuile];
     // Toiture 2 pans
-    const L = parseFloat(vTuile.L||0), l = parseFloat(vTuile.l||0), h = parseFloat(vTuile.h||0);
+    const L = parseFloat(vTuile.L||0), l = parseFloat(vTuile.l||0), pente = parseFloat(vTuile.pente||0);
+    const h = (pente / 100) * (l / 2);
     const ramp = Math.sqrt((l/2)**2 + h**2);
     const surf = 2 * L * ramp;
     const qNet = Math.ceil(surf * f.u_m2);
     const qTot = Math.ceil(qNet * 1.05);
     const palEnt = Math.floor(qTot / f.pal), palRest = qTot % f.pal;
     const palLabel = palRest > 0 ? `${palEnt} pal. + ${palRest} u` : `${palEnt} palette${palEnt>1?"s":""} pile`;
-    setResTuile({ "Longueur rampant": `${ramp.toFixed(2)} m`, "Surface toiture": `${surf.toFixed(2)} m²`, "Tuiles nettes": `${qNet} u`, "Tuiles +5% casse": `${qTot} u`, [`Palettes (${f.pal} u/pal)`]: palLabel });
+    setResTuile({ "Hauteur de faîtage calculée": `${h.toFixed(2)} m`, "Longueur rampant": `${ramp.toFixed(2)} m`, "Surface toiture": `${surf.toFixed(2)} m²`, "Tuiles nettes": `${qNet} u`, "Tuiles +5% casse": `${qTot} u`, [`Palettes (${f.pal} u/pal)`]: palLabel });
   };
 
   // Faîtières
@@ -3621,7 +3622,11 @@ function CalcCharpente() {
   const [vRive, setVRive] = useState({});
   const [resRive, setResRive] = useState(null);
   const calcRive = () => {
-    const ramp = Math.sqrt((parseFloat(vTuile.l||vRive.l||0)/2)**2 + parseFloat(vTuile.h||vRive.h||0)**2);
+    const lRef = parseFloat(vTuile.l||vRive.l||0);
+    const penteRef = parseFloat(vTuile.pente||vRive.pente||0);
+    const hRef = (penteRef / 100) * (lRef / 2);
+    const rampCalc = lRef ? Math.sqrt((lRef/2)**2 + hRef**2) : 0;
+    const ramp = rampCalc || parseFloat(vRive.ramp||0);
     const Lr = ramp || parseFloat(vRive.ramp||0);
     const pml = parseFloat(vRive.pml||4); // pièces par mètre linéaire (tuile mécanique ≈ 4/ml)
     const nbParRive = Math.ceil(Lr * pml * 1.05);
@@ -3661,7 +3666,7 @@ function CalcCharpente() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           <Input label="Longueur faîtière (m)" value={vTuile.L||""} onChange={v => setVTuile(p=>({...p,L:v}))} type="number" placeholder="10" />
           <Input label="Largeur hors tout (m)" value={vTuile.l||""} onChange={v => setVTuile(p=>({...p,l:v}))} type="number" placeholder="8" />
-          <Input label="Hauteur faîtage (m)"   value={vTuile.h||""} onChange={v => setVTuile(p=>({...p,h:v}))} type="number" placeholder="2" />
+          <Input label="Pente (%)" value={vTuile.pente||""} onChange={v => setVTuile(p=>({...p,pente:v}))} type="number" placeholder="35" />
         </div>
         <button onClick={calcTuile} style={{ background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, padding:"10px 22px", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", alignSelf:"flex-start" }}>Calculer</button>
         <ResultBox result={resTuile} />
@@ -3682,11 +3687,11 @@ function CalcCharpente() {
 
       <CalcCard title="Tuiles de rive (gauche & droite)">
         <div style={{ background:"#f5f4f0", borderRadius:8, padding:"7px 11px", fontSize:12, color:C.muted, border:`1px solid ${C.border}`, marginBottom:4 }}>
-          Si tu as déjà renseigné la largeur et hauteur dans « Tuiles courantes », la longueur du rampant est reprise automatiquement.
+          Si tu as déjà renseigné la largeur et le % de pente dans « Tuiles courantes », la longueur du rampant est reprise automatiquement.
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <Input label="Largeur hors tout (m) — si différente" value={vRive.l||""} onChange={v => setVRive(p=>({...p,l:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
-          <Input label="Hauteur faîtage (m) — si différente"   value={vRive.h||""} onChange={v => setVRive(p=>({...p,h:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
+          <Input label="Pente (%) — si différente" value={vRive.pente||""} onChange={v => setVRive(p=>({...p,pente:v}))} type="number" placeholder="Laisser vide si déjà renseigné" />
           <Input label="Longueur rampant (m) — optionnel"       value={vRive.ramp||""} onChange={v => setVRive(p=>({...p,ramp:v}))} type="number" placeholder="Si connu directement" />
           <Input label="Pièces par mètre linéaire"              value={vRive.pml||""} onChange={v => setVRive(p=>({...p,pml:v}))} type="number" placeholder="4" />
         </div>
