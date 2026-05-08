@@ -2019,7 +2019,7 @@ function TabDashboard({ userId, supaChantiers, supaSettings, userLabel, onNaviga
 // ══════════════════════════════════════════════════════════════════════════
 // TAB 1 — CHANTIERS
 // ══════════════════════════════════════════════════════════════════════════
-function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntreprise }) {
+function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntreprise, supaPV }) {
   const mob = useIsMobile();
   const { chantiers, saveNew, update: updateChantier, del: delChantier } = supaChantiers;
   const { settings, saveSettings } = supaSettings;
@@ -2299,7 +2299,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                 ) : detailTab === "rappels" ? (
                   <RappelsPanel chantier={sel} onUpdate={updateChantier} phases={phases} />
                 ) : (
-                  <DocumentsTab chantier={sel} onUpdate={updateChantier} />
+                  <DocumentsTab chantier={sel} onUpdate={updateChantier} pvs={supaPV?.pvs} entreprise={supaEntreprise?.entreprise} />
                 )}
               </div>
             </div>
@@ -2362,12 +2362,17 @@ function BudgetTab({ chantier, onUpdate }) {
 }
 
 // ── DocumentsTab ───────────────────────────────────────────────────────────
-function DocumentsTab({ chantier, onUpdate }) {
+function DocumentsTab({ chantier, onUpdate, pvs, entreprise }) {
   const docs = chantier.documents || [];
   const [draft, setDraft] = useState({ nom:"", type:"Devis", statut:"En attente", date:"" });
   const DOC_TYPES   = ["Devis","Facture","Contrat","PV","Plan","Bon de commande","Autre"];
   const DOC_STATUTS = ["En attente","Envoyé","Reçu","Signé","Validé"];
   const DOC_COLORS  = { "En attente":C.muted, "Envoyé":C.blue, "Reçu":C.orange, "Signé":C.green, "Validé":C.green };
+
+  const openPV = (pvId) => {
+    const pvData = (pvs||[]).find(p => p.id === pvId);
+    if (pvData) exportPVPDF(pvData, entreprise, null, null);
+  };
 
   const add = () => {
     if (!draft.nom.trim()) return;
@@ -2397,6 +2402,11 @@ function DocumentsTab({ chantier, onUpdate }) {
                 <div style={{ fontSize:13, fontWeight:600, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{doc.nom}</div>
                 <div style={{ fontSize:10, color:C.muted, marginTop:2 }}>{doc.type}{doc.date ? ` · ${new Date(doc.date+"T12:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}` : ""}</div>
               </div>
+              {doc.type === "PV" && doc.pvId && (
+                <button onClick={() => openPV(doc.pvId)} style={{ background:C.blueL, color:C.blue, border:`1px solid ${C.blue}30`, borderRadius:99, padding:"3px 10px", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
+                  📄 Ouvrir
+                </button>
+              )}
               <button onClick={() => toggleStatut(doc.id)} style={{ background:(DOC_COLORS[doc.statut]||C.muted)+"15", color:DOC_COLORS[doc.statut]||C.muted, border:`1px solid ${(DOC_COLORS[doc.statut]||C.muted)}30`, borderRadius:99, padding:"3px 10px", fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
                 {doc.statut}
               </button>
@@ -2788,16 +2798,24 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
   };
 
   const handleSavePV = async () => {
-    if (!pv.chantierId || !updateChantier) return;
+    if (!pv.chantierId || !updateChantier || !savePV) return;
     setPvSaving(true);
-    const chan = (chantiers||[]).find(c => c.id === pv.chantierId);
-    if (chan) {
-      const docs = chan.documents ? [...chan.documents] : [];
-      const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
-      docs.push({ nom: nomPV, date: pv.date || new Date().toISOString().split("T")[0], type: "PV" });
-      await updateChantier({ ...chan, documents: docs });
+    try {
+      // 1. Sauvegarder le PV dans pv_receptions
+      const saved = await savePV(pv);
+      if (!saved) { setPvSaving(false); return; }
+
+      // 2. Ajouter une entrée dans les documents du chantier, liée au PV
+      const chan = (chantiers||[]).find(c => c.id === pv.chantierId);
+      if (chan) {
+        const docs = chan.documents ? [...chan.documents] : [];
+        const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
+        docs.push({ id: Date.now(), nom: nomPV, date: pv.date || new Date().toISOString().split("T")[0], type: "PV", statut: "Signé", pvId: saved.id });
+        await updateChantier({ ...chan, documents: docs });
+      }
+    } finally {
+      setPvSaving(false);
     }
-    setPvSaving(false);
   };
 
   const exportPDF = (contenu, titre) => {
@@ -5019,7 +5037,7 @@ function App() {
         <AppHeader mob={mob} setSidebarOpen={setSidebarOpen} notifCount={notifCount} onNavigate={setTab} />
         <div style={{ flex:1, overflowY:"auto", overflowX: mob ? "hidden" : "auto", padding: mob ? "16px 14px" : "24px 28px", paddingBottom: mob ? 80 : 24 }}>
           {tab === "dashboard"  && <TabDashboard userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} userLabel={userLabel} onNavigate={setTab} notifCount={notifCount} />}
-          {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} />}
+          {tab === "chantiers"  && <TabChantiers userId={user.id} supaChantiers={supaChantiers} supaSettings={supaSettings} exportPDF={exportChantiertPDF} supaEntreprise={supaEntreprise} supaPV={supaPV} />}
           {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} supaLogos={supaLogos} />}
           {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
           {tab === "documents"  && <TabDocuments />}
