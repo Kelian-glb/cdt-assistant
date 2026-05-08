@@ -382,48 +382,67 @@ function useSupaSettings(userId) {
   return { settings, saveSettings };
 }
 
-// ── Hook Logos ──────────────────────────────────────────────────────────────
+// ── Hook Logos (Supabase) ────────────────────────────────────────────────────
 function useSupaLogos(userId) {
   const [logos, setLogos] = useState([]);
   const [defaultLogoId, setDefaultLogoId] = useState(null);
 
-  // Chargement depuis localStorage dès que l'userId est disponible
+  const _toState = (rows) => rows.map(r => ({ id: r.id, name: r.name, dataUrl: r.data_url, isDefault: r.is_default }));
+
   useEffect(() => {
     if (!userId) return;
-    try {
-      const raw = localStorage.getItem(`logos_${userId}`);
-      if (raw) setLogos(JSON.parse(raw));
-      const defRaw = localStorage.getItem(`logo_default_${userId}`);
-      if (defRaw) setDefaultLogoId(JSON.parse(defRaw));
-    } catch {}
+    (async () => {
+      const { data, error } = await supabase.from("user_logos").select("*").eq("user_id", userId).order("created_at", { ascending: true });
+      if (!error && data) {
+        const mapped = _toState(data);
+        setLogos(mapped);
+        const def = data.find(r => r.is_default);
+        if (def) setDefaultLogoId(def.id);
+      }
+
+      // Migration depuis localStorage
+      try {
+        const raw = localStorage.getItem(`logos_${userId}`);
+        if (raw) {
+          const local = JSON.parse(raw);
+          if (local.length && (!data || data.length === 0)) {
+            const defRaw = localStorage.getItem(`logo_default_${userId}`);
+            const localDefId = defRaw ? JSON.parse(defRaw) : null;
+            for (const logo of local) {
+              await supabase.from("user_logos").insert({
+                user_id: userId, name: logo.name, data_url: logo.dataUrl,
+                is_default: logo.id === localDefId,
+              });
+            }
+            const { data: fresh } = await supabase.from("user_logos").select("*").eq("user_id", userId).order("created_at", { ascending: true });
+            if (fresh) { setLogos(_toState(fresh)); const def = fresh.find(r => r.is_default); if (def) setDefaultLogoId(def.id); }
+            localStorage.removeItem(`logos_${userId}`);
+            localStorage.removeItem(`logo_default_${userId}`);
+          }
+        }
+      } catch {}
+    })();
   }, [userId]);
 
-  const _persist = (newLogos) => {
-    if (!userId) return;
-    try { localStorage.setItem(`logos_${userId}`, JSON.stringify(newLogos)); } catch {}
-  };
-
   const saveLogo = async (name, dataUrl) => {
-    const newLogo = { id: Date.now(), name, dataUrl };
-    const updated = [...logos, newLogo];
-    setLogos(updated);
-    _persist(updated);
+    const { data, error } = await supabase.from("user_logos").insert({ user_id: userId, name, data_url: dataUrl, is_default: false }).select().single();
+    if (error || !data) return null;
+    const newLogo = { id: data.id, name: data.name, dataUrl: data.data_url, isDefault: false };
+    setLogos(prev => [...prev, newLogo]);
     return newLogo;
   };
 
   const deleteLogo = async (id) => {
-    const updated = logos.filter(l => l.id !== id);
-    setLogos(updated);
-    _persist(updated);
-    if (defaultLogoId === id) {
-      setDefaultLogoId(null);
-      try { localStorage.removeItem(`logo_default_${userId}`); } catch {}
-    }
+    await supabase.from("user_logos").delete().eq("id", id).eq("user_id", userId);
+    setLogos(prev => prev.filter(l => l.id !== id));
+    if (defaultLogoId === id) setDefaultLogoId(null);
   };
 
-  const saveDefaultLogo = (id) => {
+  const saveDefaultLogo = async (id) => {
+    await supabase.from("user_logos").update({ is_default: false }).eq("user_id", userId);
+    await supabase.from("user_logos").update({ is_default: true }).eq("id", id).eq("user_id", userId);
     setDefaultLogoId(id);
-    try { localStorage.setItem(`logo_default_${userId}`, JSON.stringify(id)); } catch {}
+    setLogos(prev => prev.map(l => ({ ...l, isDefault: l.id === id })));
   };
 
   return { logos, defaultLogoId, saveLogo, deleteLogo, saveDefaultLogo };
