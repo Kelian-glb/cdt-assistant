@@ -2144,8 +2144,6 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
               const nextAction = (c.rappels||[]).find(r => !r.regle);
               const pct = phaseInfo(c.phase).pct;
               const statusCol = STATUS_COLORS[c.statut] || C.muted;
-              const budget = parseFloat(c.budget||0);
-              const depenses = parseFloat(c.depenses||0);
               return (
                 <div key={c.id} onClick={() => { setSelected(c.id); setForm(null); setDetailTab("infos"); }}
                   style={{ background:"#fff",
@@ -2171,24 +2169,6 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                     <ProgressBar value={pct} />
                   </div>
 
-                  {budget > 0 && (
-                    <div style={{ display:"flex", gap:10, marginTop:8, padding:"7px 10px", background:C.surface2, borderRadius:8 }}>
-                      <div style={{ flex:1, textAlign:"center" }}>
-                        <div style={{ fontSize:10, color:C.muted }}>Budget</div>
-                        <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{budget.toLocaleString("fr-FR")} €</div>
-                      </div>
-                      <div style={{ width:1, background:C.border }} />
-                      <div style={{ flex:1, textAlign:"center" }}>
-                        <div style={{ fontSize:10, color:C.muted }}>Dépenses</div>
-                        <div style={{ fontSize:12, fontWeight:700, color: depenses > budget ? C.red : C.text }}>{depenses.toLocaleString("fr-FR")} €</div>
-                      </div>
-                      <div style={{ width:1, background:C.border }} />
-                      <div style={{ flex:1, textAlign:"center" }}>
-                        <div style={{ fontSize:10, color:C.muted }}>Marge</div>
-                        <div style={{ fontSize:12, fontWeight:700, color: (budget-depenses) >= 0 ? C.green : C.red }}>{(budget-depenses).toLocaleString("fr-FR")} €</div>
-                      </div>
-                    </div>
-                  )}
 
                   {nextAction && (
                     <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6, padding:"6px 10px", background:"#fff8f0", border:`1px solid ${C.orange}25`, borderRadius:8, overflow:"hidden" }}>
@@ -2237,8 +2217,6 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                 </div>
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                <Input label="Budget HT (€)" value={draft.budget||""} onChange={v => setDraft(d=>({...d,budget:v}))} placeholder="125 000" />
-                <Input label="Dépenses HT (€)" value={draft.depenses||""} onChange={v => setDraft(d=>({...d,depenses:v}))} placeholder="0" />
               </div>
               <Textarea label="Notes" value={draft.notes||""} onChange={v => setDraft(d=>({...d,notes:v}))} rows={3} placeholder="Observations..." />
               <div style={{ display:"flex", gap:8 }}>
@@ -2282,7 +2260,7 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                   </div>
                 </div>
                 <div style={{ display:"flex", gap:0, borderBottom:`1px solid ${C.border}`, overflowX:"auto" }}>
-                  {[["infos","📋 Infos","📋 Infos"],["budget","💶 Budget","💶 Budget"],["checklist","✅ Checklist","✅ Check"],["rappels","🔔 Rappels","🔔 Rappels"],["documents","📁 Documents","📁 Docs"]].map(([id,label,lMob]) => {
+                  {[["infos","📋 Infos","📋 Infos"],["checklist","✅ Checklist","✅ Check"],["rappels","🔔 Rappels","🔔 Rappels"],["documents","📁 Documents","📁 Docs"]].map(([id,label,lMob]) => {
                     const rappelsEnAttente = id==="rappels" ? (sel.rappels||[]).filter(r=>!r.regle).length : 0;
                     return (
                       <button key={id} onClick={() => setDetailTab(id)} style={{
@@ -2319,8 +2297,6 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
                       <Btn small variant="ghost" onClick={() => exportPDF && exportPDF(sel, phases, modeles, entreprise)}>📄 Exporter PDF</Btn>
                     </div>
                   </div>
-                ) : detailTab === "budget" ? (
-                  <BudgetTab chantier={sel} onUpdate={updateChantier} />
                 ) : detailTab === "checklist" ? (
                   <ChecklistPanel chantier={sel} onUpdate={updateChantier} modeles={modeles} />
                 ) : detailTab === "rappels" ? (
@@ -2338,53 +2314,6 @@ function TabChantiers({ userId, supaChantiers, supaSettings, exportPDF, supaEntr
         </div>}
       </div>
     </>
-  );
-}
-
-// ── BudgetTab ─────────────────────────────────────────────────────────────
-function BudgetTab({ chantier, onUpdate }) {
-  const budget   = parseFloat(chantier.budget||0);
-  const depenses = parseFloat(chantier.depenses||0);
-  const marge    = budget - depenses;
-  const pctDep   = budget > 0 ? Math.min(100, Math.round(depenses/budget*100)) : 0;
-  const pctMarge = budget > 0 ? Math.round(marge/budget*100) : 0;
-
-  const Stat = ({ label, val, color, sub }) => (
-    <div style={{ background:"#fff", border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 18px" }}>
-      <div style={{ fontSize:11, color:C.muted, fontWeight:600, letterSpacing:".07em", textTransform:"uppercase", marginBottom:8 }}>{label}</div>
-      <div style={{ fontSize:22, fontWeight:800, color: color || C.text, letterSpacing:"-.01em" }}>{val}</div>
-      {sub && <div style={{ fontSize:11, color:C.muted, marginTop:4 }}>{sub}</div>}
-    </div>
-  );
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-        <Stat label="Budget HT" val={budget > 0 ? budget.toLocaleString("fr-FR")+" €" : "—"} />
-        <Stat label="Dépenses HT" val={depenses > 0 ? depenses.toLocaleString("fr-FR")+" €" : "—"} color={depenses > budget && budget > 0 ? C.red : undefined} sub={budget > 0 ? `${pctDep}% du budget` : undefined} />
-        <Stat label="Marge estimée" val={budget > 0 ? marge.toLocaleString("fr-FR")+" €" : "—"} color={marge >= 0 ? C.green : C.red} sub={budget > 0 ? `${pctMarge}% du budget` : undefined} />
-        <Stat label="Reste à dépenser" val={budget > 0 ? Math.max(0, marge).toLocaleString("fr-FR")+" €" : "—"} />
-      </div>
-      {budget > 0 && (
-        <div style={{ background:"#f5f4f0", borderRadius:12, padding:"14px 16px" }}>
-          <div style={{ fontSize:11, color:C.muted, fontWeight:600, marginBottom:10 }}>Répartition du budget</div>
-          <div style={{ height:10, background:"#e5e5ea", borderRadius:99, overflow:"hidden", display:"flex" }}>
-            <div style={{ width:`${pctDep}%`, background: depenses > budget ? C.red : C.orange, borderRadius:99, transition:"width .4s" }} />
-          </div>
-          <div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
-            <span style={{ fontSize:10, color:C.muted }}>Dépenses : {pctDep}%</span>
-            <span style={{ fontSize:10, color:C.muted }}>Marge : {Math.max(0, pctMarge)}%</span>
-          </div>
-        </div>
-      )}
-      <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
-        <div style={{ fontSize:11, color:C.muted, fontWeight:600, letterSpacing:".07em", textTransform:"uppercase", marginBottom:10 }}>Modifier les montants</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          <Input label="Budget HT (€)" value={chantier.budget||""} onChange={v => onUpdate({ ...chantier, budget:v })} placeholder="125 000" />
-          <Input label="Dépenses HT (€)" value={chantier.depenses||""} onChange={v => onUpdate({ ...chantier, depenses:v })} placeholder="0" />
-        </div>
-      </div>
-    </div>
   );
 }
 
