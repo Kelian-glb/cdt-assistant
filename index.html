@@ -337,8 +337,8 @@ function useSupaChantiers(userId) {
   useEffect(() => { load(); }, [load]);
 
   const saveNew = async (c) => {
-    const { nom, client, commune, statut, phase, notes, checks, rappels } = c;
-    const { data } = await supabase.from("chantiers").insert({ nom, client, commune, statut, phase, notes, checks, rappels, user_id: userId }).select().single();
+    const { nom, client, commune, statut, phase, notes, checks, rappels, documents, budget, prochaine_action } = c;
+    const { data } = await supabase.from("chantiers").insert({ nom, client, commune, statut, phase, notes, checks, rappels, documents: documents || [], budget, prochaine_action, user_id: userId }).select().single();
     setChantiers(prev => [data, ...(prev||[])]);
     return data;
   };
@@ -549,18 +549,45 @@ function useSupaCR(userId) {
 function useSupaPV(userId) {
   const [pvs, setPvs] = useState(null);
 
+  const _map = (r) => ({
+    id: r.id,
+    chantierId:       r.chantier_id,
+    date:             r.date,
+    sousTraitant:     r.sous_traitant,
+    maitroeuvre:      r.maitre_oeuvre,
+    lot:              r.lot,
+    poste:            r.poste,
+    statut:           r.statut,
+    travauxRestants:  r.travaux_restants,
+    travauxAReprendre:r.travaux_a_reprendre,
+    logoUrl:          r.logo_url,
+  });
+
   useEffect(() => {
     if (!userId) return;
     supabase.from("pv_receptions").select("*").eq("user_id", userId).order("created_at", { ascending: false })
-      .then(({ data }) => setPvs(data || []));
+      .then(({ data }) => setPvs((data || []).map(_map)));
   }, [userId]);
 
   const savePV = async (pv) => {
-    const payload = { ...pv, user_id: userId };
-    delete payload.id;
-    const { data } = await supabase.from("pv_receptions").insert(payload).select().single();
-    setPvs(prev => [data, ...(prev||[])]);
-    return data;
+    const payload = {
+      user_id:           userId,
+      chantier_id:       pv.chantierId,
+      date:              pv.date,
+      sous_traitant:     pv.sousTraitant,
+      maitre_oeuvre:     pv.maitroeuvre,
+      lot:               pv.lot,
+      poste:             pv.poste,
+      statut:            pv.statut,
+      travaux_restants:  pv.travauxRestants,
+      travaux_a_reprendre: pv.travauxAReprendre,
+      logo_url:          pv.logoUrl,
+    };
+    const { data, error } = await supabase.from("pv_receptions").insert(payload).select().single();
+    if (error || !data) return null;
+    const mapped = _map(data);
+    setPvs(prev => [mapped, ...(prev||[])]);
+    return mapped;
   };
 
   const delPV = async (id) => {
