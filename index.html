@@ -429,6 +429,53 @@ function useSupaLogos(userId) {
   return { logos, defaultLogoId, saveLogo, deleteLogo, saveDefaultLogo };
 }
 
+// ── Hook Historique sous-traitants (Supabase) ───────────────────────────────
+function useSupaSTHistory(userId) {
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      const { data } = await supabase.from("user_settings").select("st_history").eq("user_id", userId).maybeSingle();
+      if (data?.st_history?.length) {
+        setHistory(data.st_history);
+      } else {
+        // Migration depuis localStorage
+        try {
+          const raw = localStorage.getItem(`st_history_${userId}`);
+          if (raw) {
+            const local = JSON.parse(raw);
+            if (local.length) { setHistory(local); _save(local); localStorage.removeItem(`st_history_${userId}`); }
+          }
+        } catch {}
+      }
+    })();
+  }, [userId]);
+
+  const _save = async (list) => {
+    const { data: ex } = await supabase.from("user_settings").select("id").eq("user_id", userId).maybeSingle();
+    const payload = { st_history: list, updated_at: new Date().toISOString() };
+    if (ex) await supabase.from("user_settings").update(payload).eq("user_id", userId);
+    else await supabase.from("user_settings").insert({ ...payload, user_id: userId });
+  };
+
+  const add = async (val) => {
+    if (!val?.trim()) return;
+    const clean = val.trim();
+    const updated = [clean, ...history.filter(h => h.toLowerCase() !== clean.toLowerCase())].slice(0, 30);
+    setHistory(updated);
+    await _save(updated);
+  };
+
+  const remove = async (val) => {
+    const updated = history.filter(h => h !== val);
+    setHistory(updated);
+    await _save(updated);
+  };
+
+  return { history, add, remove };
+}
+
 // ── Hook Entreprise ─────────────────────────────────────────────────────────
 function useSupaEntreprise(userId) {
   const [entreprise, setEntreprise] = useState(null);
@@ -946,25 +993,14 @@ function Input({ label, value, onChange, type = "text", placeholder, style }) {
   );
 }
 
-function InputAutocomplete({ label, value, onChange, placeholder, historyKey, style }) {
+function InputAutocomplete({ label, value, onChange, placeholder, history = [], onAddToHistory, onRemoveFromHistory, style }) {
   const [focus, setFocus] = useState(false);
   const [open, setOpen] = useState(false);
-  const [history, setHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(historyKey) || "[]"); } catch { return []; }
-  });
   const wrapRef = useRef(null);
 
   const suggestions = history
     .filter(h => !value.trim() || h.toLowerCase().includes(value.toLowerCase()))
     .slice(0, 8);
-
-  const addToHistory = (val) => {
-    if (!val.trim() || !historyKey) return;
-    const clean = val.trim();
-    const updated = [clean, ...history.filter(h => h.toLowerCase() !== clean.toLowerCase())].slice(0, 30);
-    setHistory(updated);
-    try { localStorage.setItem(historyKey, JSON.stringify(updated)); } catch {}
-  };
 
   useEffect(() => {
     const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
@@ -990,7 +1026,7 @@ function InputAutocomplete({ label, value, onChange, placeholder, historyKey, st
           boxShadow: focus ? `0 0 0 3px ${C.blue}20` : "none",
         }}
         onFocus={() => { setFocus(true); setOpen(true); }}
-        onBlur={() => { setFocus(false); setTimeout(() => setOpen(false), 150); addToHistory(value); }}
+        onBlur={() => { setFocus(false); setTimeout(() => setOpen(false), 200); onAddToHistory?.(value); }}
       />
       {showList && (
         <div style={{
@@ -1000,17 +1036,27 @@ function InputAutocomplete({ label, value, onChange, placeholder, historyKey, st
           boxShadow:"0 6px 20px rgba(0,0,0,.13)",
         }}>
           {suggestions.map((h, i) => (
-            <div key={i}
-              onMouseDown={() => { onChange(h); setOpen(false); }}
-              style={{
-                padding:"9px 13px", fontSize:14, cursor:"pointer", color:C.text,
-                borderTop: i > 0 ? `1px solid ${C.border}` : "none",
-                transition:"background .1s",
-              }}
+            <div key={i} style={{
+              display:"flex", alignItems:"center",
+              borderTop: i > 0 ? `1px solid ${C.border}` : "none",
+            }}
               onMouseEnter={e => e.currentTarget.style.background = C.blueL}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
-              {h}
+              <div onMouseDown={() => { onChange(h); setOpen(false); }}
+                style={{ flex:1, padding:"9px 13px", fontSize:14, cursor:"pointer", color:C.text }}>
+                {h}
+              </div>
+              <button
+                onMouseDown={e => { e.preventDefault(); onRemoveFromHistory?.(h); }}
+                title="Supprimer de l'historique"
+                style={{
+                  background:"none", border:"none", cursor:"pointer", padding:"9px 12px",
+                  color:C.faint, fontSize:15, lineHeight:1, flexShrink:0,
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = C.red}
+                onMouseLeave={e => e.currentTarget.style.color = C.faint}
+              >×</button>
             </div>
           ))}
         </div>
@@ -2592,6 +2638,7 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   const { pvs, savePV } = supaPV || {};
   const { chantiers, update: updateChantier } = supaChantiers;
   const { entreprise, save: saveEntreprise } = supaEntreprise;
+  const stHistory = useSupaSTHistory(userId);
 
   const [view, setView] = useState("form"); // "form" | "historique" | "pv" | "entreprise"
 
@@ -2956,7 +3003,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
           {/* Maître d'œuvre + Sous-traitant */}
           <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
             <Input label="Maître d'œuvre" value={pv.maitroeuvre} onChange={v => setPv(p=>({...p,maitroeuvre:v}))} placeholder="NEO SUD" />
-            <InputAutocomplete label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" historyKey={`st_history_${userId}`} />
+            <InputAutocomplete label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" history={stHistory.history} onAddToHistory={stHistory.add} onRemoveFromHistory={stHistory.remove} />
           </div>
 
           {/* Lot + Poste */}
