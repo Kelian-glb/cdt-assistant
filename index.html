@@ -2659,7 +2659,7 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   const { entreprise, save: saveEntreprise } = supaEntreprise;
   const stHistory = useSupaSTHistory(userId);
 
-  const [view, setView] = useState("form"); // "form" | "historique" | "pv" | "entreprise"
+  const [view, setView] = useState("pv"); // "form" | "historique" | "pv" | "entreprise"
 
   // ── CR state ──
   const [cr, setCr] = useState({
@@ -2857,8 +2857,8 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
 
       {/* onglets */}
       <div style={{ display:"flex", background:C.surface2, borderRadius:10, padding:3, width:"100%" }}>
-        {tabBtn("form", mob ? "✏️ CR" : "✏️ Nouveau CR")}
         {tabBtn("pv", mob ? "📝 PV" : "📝 PV Réception")}
+        {tabBtn("form", mob ? "✏️ CR" : "✏️ Nouveau CR")}
         {tabBtn("historique", mob ? `📚 (${(crs||[]).length})` : `📚 Historique (${(crs||[]).length})`)}
       </div>
 
