@@ -4370,19 +4370,19 @@ function TabDocuments() {
 }
 
 // ── Planning + Google Agenda ───────────────────────────────────────────────
-function TabPlanning({ supaChantiers }) {
+function TabPlanning({ supaChantiers, initialGToken }) {
   const mob = useIsMobile();
   const { chantiers } = supaChantiers;
 
   const [gClientId, setGClientId] = useState(() => localStorage.getItem("gca_client_id") || "");
-  const [gToken, setGToken]       = useState(null);
+  const [gEmail, setGEmail]       = useState(() => localStorage.getItem("gca_email") || "");
+  const [gToken, setGToken]       = useState(initialGToken || null);
   const [gEvents, setGEvents]     = useState([]);
   const [syncing, setSyncing]     = useState(false);
   const [syncMsg, setSyncMsg]     = useState("");
   const [showSetup, setShowSetup] = useState(false);
   const [clientIdDraft, setClientIdDraft] = useState(gClientId);
   const [weekOffset, setWeekOffset] = useState(0);
-  const tokenClientRef = useRef(null);
 
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -4417,27 +4417,21 @@ function TabPlanning({ supaChantiers }) {
     return { d, dStr, name: JOURS_COURT[i], longName: JOURS_LONG[i], num: d.getDate(), month: d.getMonth(), isToday: dStr === todayStr, events: [...localEvs, ...googleEvs] };
   });
 
-  const initTokenClient = () => {
-    if (!gClientId || !window.google?.accounts) return false;
-    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-      client_id: gClientId,
-      scope: "https://www.googleapis.com/auth/calendar.events",
-      callback: async (resp) => {
-        if (resp.access_token) {
-          setGToken(resp.access_token);
-          await loadGoogleEvents(resp.access_token);
-        } else {
-          setSyncMsg("❌ Connexion Google échouée.");
-        }
-      }
-    });
-    return true;
-  };
+  useEffect(() => {
+    if (initialGToken) loadGoogleEvents(initialGToken);
+  }, [initialGToken]);
 
   const connectGoogle = () => {
     if (!gClientId) { setShowSetup(true); return; }
-    if (!tokenClientRef.current) { if (!initTokenClient()) { setShowSetup(true); return; } }
-    tokenClientRef.current.requestAccessToken();
+    const redirectUri = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams({
+      client_id: gClientId,
+      redirect_uri: redirectUri,
+      response_type: "token",
+      scope: "https://www.googleapis.com/auth/calendar.events",
+    });
+    if (gEmail.trim()) { params.set("login_hint", gEmail.trim()); localStorage.setItem("gca_email", gEmail.trim()); }
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   };
 
   const loadGoogleEvents = async (token) => {
@@ -4494,7 +4488,7 @@ function TabPlanning({ supaChantiers }) {
   const saveClientId = () => {
     const id = clientIdDraft.trim();
     localStorage.setItem("gca_client_id", id);
-    setGClientId(id); tokenClientRef.current = null; setShowSetup(false);
+    setGClientId(id); setShowSetup(false);
   };
 
   const card = (extra={}) => ({ background:"#fff", borderRadius:22, padding:"24px 28px", border:"1px solid rgba(0,0,0,.07)", boxShadow:"0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.04)", ...extra });
@@ -4506,26 +4500,19 @@ function TabPlanning({ supaChantiers }) {
       {/* Setup modal */}
       {showSetup && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-          <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:520, padding:"28px 24px", boxShadow:"0 20px 60px rgba(0,0,0,.2)" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-              <div style={{ fontSize:17, fontWeight:700 }}>🔧 Configurer Google Agenda</div>
+          <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:420, padding:"28px 24px", boxShadow:"0 20px 60px rgba(0,0,0,.2)" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+              <div style={{ fontSize:17, fontWeight:700 }}>Connexion Google Agenda</div>
               <button onClick={() => setShowSetup(false)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:22, color:"#888" }}>×</button>
             </div>
-            <div style={{ fontSize:13, color:"#6d6d72", lineHeight:1.7, marginBottom:16 }}>
-              Pour synchroniser avec Google Agenda, créez des identifiants OAuth dans Google Cloud :<br/>
-              <ol style={{ margin:"10px 0 10px 18px", padding:0, display:"flex", flexDirection:"column", gap:4 }}>
-                <li>Allez sur <strong>console.cloud.google.com</strong></li>
-                <li>Créez un projet → activez l'<strong>API Google Calendar</strong></li>
-                <li>Identifiants → <strong>ID client OAuth 2.0</strong> (Application Web)</li>
-                <li>Origines JS autorisées : <code style={{ background:"#f2f2f7", borderRadius:4, padding:"1px 5px" }}>https://kelian-glb.github.io</code></li>
-                <li>Copiez l'<strong>ID client</strong> ci-dessous</li>
-              </ol>
+            <div style={{ fontSize:13, color:"#6d6d72", marginBottom:14 }}>
+              Entrez l'ID Client OAuth de votre application Google (disponible sur <strong>console.cloud.google.com</strong>).
             </div>
             <input
-              placeholder="Collez votre Client ID Google ici..."
+              placeholder="ID Client OAuth Google..."
               value={clientIdDraft}
               onChange={e => setClientIdDraft(e.target.value)}
-              style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"1px solid rgba(0,0,0,.12)", fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box", marginBottom:14 }}
+              style={{ width:"100%", padding:"10px 14px", borderRadius:10, border:"1px solid rgba(0,0,0,.12)", fontSize:13, fontFamily:"inherit", outline:"none", boxSizing:"border-box", marginBottom:12 }}
             />
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
               <button onClick={() => setShowSetup(false)} style={{ ...btn("#f2f2f7","#1c1c1e") }}>Annuler</button>
@@ -4541,21 +4528,30 @@ function TabPlanning({ supaChantiers }) {
           <div style={{ fontSize:mob?18:22, fontWeight:700, color:"#1c1c1e", letterSpacing:"-.02em" }}>Planning</div>
           <div style={{ fontSize:12, color:"#6d6d72", marginTop:2 }}>{allLocalRappels.length} rappel(s) au total</div>
         </div>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
           {gToken
             ? <button onClick={syncToGoogle} disabled={syncing} style={{ ...btn("#30d158") }}>
                 {syncing ? "⏳ Sync..." : "🔄 Sync Google Agenda"}
               </button>
-            : <button onClick={connectGoogle} style={{ ...btn("#4285f4") }}>
-                <span style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#fff" d="M43.6 20H24v8h11.3C33.9 33.6 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.3 6.5 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z"/></svg>
-                  Connecter Google Agenda
-                </span>
-              </button>
+            : <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+                <input
+                  type="email"
+                  placeholder="Votre adresse Gmail..."
+                  value={gEmail}
+                  onChange={e => setGEmail(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && connectGoogle()}
+                  style={{ padding:"8px 12px", borderRadius:10, border:"1px solid rgba(0,0,0,.15)", fontSize:13, fontFamily:"inherit", outline:"none", width:200 }}
+                />
+                <button onClick={connectGoogle} style={{ ...btn("#4285f4") }}>
+                  <span style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <svg width="15" height="15" viewBox="0 0 48 48"><path fill="#fff" d="M43.6 20H24v8h11.3C33.9 33.6 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.3 6.5 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z"/></svg>
+                    Se connecter
+                  </span>
+                </button>
+                <button onClick={() => setShowSetup(true)} style={{ ...btn("#f2f2f7","#6d6d72"), padding:"8px 10px", fontSize:16 }} title="Configurer le Client ID">⚙</button>
+              </div>
           }
-          <button onClick={exportICS} style={{ ...btn("#f2f2f7","#1c1c1e") }}>⬇ Exporter .ics</button>
-          {!gToken && gClientId && <button onClick={() => setShowSetup(true)} style={{ ...btn("#f2f2f7","#6d6d72") }}>⚙</button>}
-          {!gClientId && <button onClick={() => setShowSetup(true)} style={{ ...btn("#f2f2f7","#6d6d72"), fontSize:11 }}>Configurer</button>}
+          <button onClick={exportICS} style={{ ...btn("#f2f2f7","#1c1c1e") }}>⬇ .ics</button>
         </div>
       </div>
 
@@ -4812,7 +4808,12 @@ function EntrepriseModal({ isOpen, onClose, supaEntreprise }) {
 
 // ══════════════════════════════════════════════════════════════════════════
 function App() {
-  const [tab, setTab] = useState("dashboard");
+  const [oauthToken] = useState(() => {
+    const m = window.location.hash.match(/access_token=([^&]+)/);
+    if (m) { window.history.replaceState(null, '', window.location.pathname + window.location.search); return m[1]; }
+    return null;
+  });
+  const [tab, setTab] = useState(() => oauthToken ? "planning" : "dashboard");
   const [user, setUser] = useState(undefined); // undefined = loading, null = non connecté
   const mob = useIsMobile();
 
@@ -4883,7 +4884,7 @@ function App() {
           {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} supaLogos={supaLogos} />}
           {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
           {tab === "documents"  && <TabDocuments />}
-          {tab === "planning"   && <TabPlanning supaChantiers={supaChantiers} />}
+          {tab === "planning"   && <TabPlanning supaChantiers={supaChantiers} initialGToken={oauthToken} />}
           {tab === "equipe"     && <TabStub label="Équipe" icon="👥" desc="Gestion des membres de l'équipe — bientôt disponible." />}
           {tab === "rapports"   && <TabStub label="Rapports" icon="📊" desc="Génération de rapports — bientôt disponible." />}
           {tab === "parametres" && <TabStub label="Paramètres" icon="⚙️" desc="Configuration de l'application." />}
