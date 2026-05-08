@@ -2798,21 +2798,31 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
   };
 
   const handleSavePV = async () => {
-    if (!pv.chantierId || !updateChantier || !savePV) return;
+    if (!pv.chantierId || !updateChantier) return;
     setPvSaving(true);
     try {
-      // 1. Sauvegarder le PV dans pv_receptions
-      const saved = await savePV(pv);
-      if (!saved) { setPvSaving(false); return; }
-
-      // 2. Ajouter une entrée dans les documents du chantier, liée au PV
       const chan = (chantiers||[]).find(c => c.id === pv.chantierId);
-      if (chan) {
-        const docs = chan.documents ? [...chan.documents] : [];
-        const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
-        docs.push({ id: Date.now(), nom: nomPV, date: pv.date || new Date().toISOString().split("T")[0], type: "PV", statut: "Signé", pvId: saved.id });
-        await updateChantier({ ...chan, documents: docs });
-      }
+      if (!chan) return;
+
+      const nomPV = `PV – ${pv.sousTraitant||"Réception"} – Lot ${pv.lot||"?"}`;
+      const docEntry = {
+        id: Date.now(),
+        nom: nomPV,
+        date: pv.date || new Date().toISOString().split("T")[0],
+        type: "PV",
+        statut: "Signé",
+      };
+
+      // Sauvegarde dans pv_receptions (best-effort : n'empêche pas le classement)
+      try {
+        if (savePV) {
+          const saved = await savePV(pv);
+          if (saved?.id) docEntry.pvId = saved.id;
+        }
+      } catch {}
+
+      const docs = [...(chan.documents || []), docEntry];
+      await updateChantier({ ...chan, documents: docs });
     } finally {
       setPvSaving(false);
     }
