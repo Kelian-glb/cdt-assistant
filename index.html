@@ -129,6 +129,7 @@
       }
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -682,11 +683,47 @@ const PDF_STYLES = `
   @media print{body{padding:20px}}
 `;
 
+async function downloadPDF(fullHtml, filename) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(fullHtml, 'text/html');
+  const styles = Array.from(doc.querySelectorAll('style')).map(s => s.textContent).join('\n');
+  let fileHandle = null;
+  if ('showSaveFilePicker' in window) {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]
+      });
+    } catch(e) { if (e.name === 'AbortError') return; }
+  }
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;color:#000';
+  wrapper.innerHTML = `<style>${styles}</style>${doc.body.innerHTML}`;
+  document.body.appendChild(wrapper);
+  try {
+    const blob = await html2pdf().set({
+      margin: 0, filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#fff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { before: '.page-break' }
+    }).from(wrapper).outputPdf('blob');
+    if (fileHandle) {
+      const w = await fileHandle.createWritable();
+      await w.write(blob); await w.close();
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  } finally { document.body.removeChild(wrapper); }
+}
+
 function openPDF(body, title) {
-  const w = window.open("", "_blank");
-  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>${title}</title><style>${PDF_STYLES}</style></head><body>${body}</body></html>`);
-  w.document.close();
-  setTimeout(() => w.print(), 600);
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>${title}</title><style>${PDF_STYLES}</style></head><body>${body}</body></html>`;
+  downloadPDF(html, title + '.pdf');
 }
 
 function exportChantiertPDF(chantier, phases, modeles, entreprise) {
@@ -756,8 +793,7 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
     `<tr><td style="width:36px;text-align:center;border:1px solid #333;padding:4px 6px">${l.num}</td><td style="border:1px solid #333;padding:4px 8px">${l.label}</td></tr>`
   ).join("");
 
-  const w = window.open("", "_blank");
-  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>PV – ${pv.sousTraitant||pv.chantier||"Réception"}</title>
+  const pvHtml = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>PV – ${pv.sousTraitant||pv.chantier||"Réception"}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Helvetica Neue',Arial,sans-serif;color:#000;background:#fff;font-size:12px;padding:28px 32px}
@@ -856,9 +892,8 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
   </table>
 </div>
 
-</body></html>`);
-  w.document.close();
-  setTimeout(() => w.print(), 600);
+</body></html>`;
+  downloadPDF(pvHtml, `PV_${(pv.sousTraitant||pv.chantier||"Reception").replace(/\s+/g,"_")}.pdf`);
 }
 
 function LogoPicker({ logos, selectedUrl, onSelect, onUpload, onDelete }) {
@@ -2814,9 +2849,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
   <span>${titre}</span>
 </div>
 </body></html>`;
-    const w = window.open("","_blank");
-    w.document.write(html); w.document.close();
-    setTimeout(() => w.print(), 500);
+    downloadPDF(html, (titre + '.pdf').replace(/[^a-zA-Z0-9._\- ]/g, '_'));
   };
 
   const copy = (txt) => { navigator.clipboard.writeText(txt).catch(()=>{}); };
