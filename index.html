@@ -3060,60 +3060,65 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
             )}
           </div>
 
-          {/* Chantier + Date */}
-          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Chantier</label>
-              <select value={pv.chantierId||""} onChange={e => {
-                const c = (chantiers||[]).find(x => String(x.id) === String(e.target.value));
-                setPv(p=>({...p, chantierId: c?.id||null, chantier: c?.client||c?.nom||"", adresseChantier: c?.commune||p.adresseChantier }));
-              }} style={iS(pv.chantierId)}>
-                <option value="">— Sélectionner —</option>
-                {(chantiers||[]).map(c => <option key={c.id} value={c.id}>{c.client||c.nom}</option>)}
-              </select>
+          {/* ── Section 1 : Chantier ── */}
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:".06em" }}>Chantier</div>
+            <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"2fr 1fr", gap:12 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Chantier</label>
+                <select value={pv.chantierId||""} onChange={e => {
+                  const c = (chantiers||[]).find(x => String(x.id) === String(e.target.value));
+                  setPv(p=>({...p, chantierId: c?.id||null, chantier: c?.client||c?.nom||"", adresseChantier: c?.commune||p.adresseChantier, maitreOuvrage: c?.client||p.maitreOuvrage }));
+                }} style={iS(pv.chantierId)}>
+                  <option value="">— Sélectionner —</option>
+                  {(chantiers||[]).map(c => <option key={c.id} value={c.id}>{c.client||c.nom}</option>)}
+                </select>
+              </div>
+              <Input label="Date de réception" value={pv.date} onChange={v => setPv(p=>({...p,date:v}))} type="date" />
             </div>
-            <Input label="Date de réception" value={pv.date} onChange={v => setPv(p=>({...p,date:v}))} type="date" />
+            <Input label="Adresse chantier" value={pv.adresseChantier} onChange={v => setPv(p=>({...p,adresseChantier:v}))} placeholder="Adresse complète du chantier" />
           </div>
 
-          {/* Maître d'ouvrage + présence */}
-          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"2fr 1fr", gap:12, alignItems:"end" }}>
-            <Input label="Maître d'ouvrage" value={pv.maitreOuvrage} onChange={v => setPv(p=>({...p,maitreOuvrage:v}))} placeholder="Nom du maître d'ouvrage" />
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Présent</label>
-              <div style={{ display:"flex", gap:10 }}>
-                {[["OUI",true],["NON",false]].map(([lbl,val]) => (
-                  <button key={lbl} onClick={() => setPv(p=>({...p,maitreOuvragePresent:val}))} style={{
-                    flex:1, padding:"9px 0", borderRadius:8, border:`1.5px solid ${pv.maitreOuvragePresent===val ? C.blue : C.border}`,
-                    background: pv.maitreOuvragePresent===val ? C.blueL : C.surface,
-                    color: pv.maitreOuvragePresent===val ? C.blue : C.muted,
-                    fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit",
-                  }}>{lbl}</button>
-                ))}
+          {/* ── Section 2 : Parties ── */}
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:".06em" }}>Parties</div>
+            <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"2fr 1fr", gap:12, alignItems:"end" }}>
+              <Input label="Maître d'ouvrage" value={pv.maitreOuvrage} onChange={v => setPv(p=>({...p,maitreOuvrage:v}))} placeholder="Nom du maître d'ouvrage" />
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Présent</label>
+                <div style={{ display:"flex", gap:8 }}>
+                  {[["OUI",true],["NON",false]].map(([lbl,val]) => (
+                    <button key={lbl} onClick={() => setPv(p=>({...p,maitreOuvragePresent:val}))} style={{
+                      flex:1, padding:"9px 0", borderRadius:8, border:`1.5px solid ${pv.maitreOuvragePresent===val ? C.blue : C.border}`,
+                      background: pv.maitreOuvragePresent===val ? C.blueL : C.surface,
+                      color: pv.maitreOuvragePresent===val ? C.blue : C.muted,
+                      fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit",
+                    }}>{lbl}</button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Adresse chantier */}
-          <Input label="Adresse chantier" value={pv.adresseChantier} onChange={v => setPv(p=>({...p,adresseChantier:v}))} placeholder="Adresse complète du chantier" />
-
-          {/* Maître d'œuvre + Sous-traitant */}
-          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
-            <Input label="Maître d'œuvre" value={pv.maitroeuvre} onChange={v => setPv(p=>({...p,maitroeuvre:v}))} placeholder="NEO SUD" />
-            <InputAutocomplete label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" history={stHistory.history} onAddToHistory={stHistory.add} onRemoveFromHistory={stHistory.remove} />
-          </div>
-
-          {/* Lot + Poste */}
-          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 2fr", gap:12 }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Lot n°</label>
-              <select value={pv.lot} onChange={e => { const lot = e.target.value; const found = LOTS_PV.find(l => String(l.num) === lot); setPv(p=>({...p, lot, poste: found ? found.label : ""})); }} style={iS(pv.lot)}>
-                <option value="">— Lot —</option>
-                {LOTS_PV.map(l => <option key={l.num} value={String(l.num)}>{l.num} – {l.label}</option>)}
-              </select>
+            <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
+              <Input label="Maître d'œuvre" value={pv.maitroeuvre} onChange={v => setPv(p=>({...p,maitroeuvre:v}))} placeholder="NEO SUD" />
+              <InputAutocomplete label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" history={stHistory.history} onAddToHistory={stHistory.add} onRemoveFromHistory={stHistory.remove} />
             </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-              <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Poste</label>
-              <input value={pv.poste} readOnly style={{...iS(pv.poste), background: C.bg, color: C.muted, cursor:"default"}} placeholder="Sélectionner un lot" />
+          </div>
+
+          {/* ── Section 3 : Lot ── */}
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:".06em" }}>Lot concerné</div>
+            <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 2fr", gap:12 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Lot n°</label>
+                <select value={pv.lot} onChange={e => { const lot = e.target.value; const found = LOTS_PV.find(l => String(l.num) === lot); setPv(p=>({...p, lot, poste: found ? found.label : ""})); }} style={iS(pv.lot)}>
+                  <option value="">— Lot —</option>
+                  {LOTS_PV.map(l => <option key={l.num} value={String(l.num)}>{l.num} – {l.label}</option>)}
+                </select>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Poste</label>
+                <input value={pv.poste} readOnly style={{...iS(pv.poste), background: C.bg, color: C.muted, cursor:"default"}} placeholder="Sélectionner un lot" />
+              </div>
             </div>
           </div>
 
