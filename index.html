@@ -894,13 +894,12 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
   <div class="field"><span class="field-label">Maître d'ouvrage :</span><span class="field-value">${pv.maitreOuvrage||""}</span></div>
 </div>
 
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:10px">
-  <div class="field" style="flex:1"><span class="field-label">Maître d'œuvre :</span><span class="field-value">${pv.maitroeuvre||"NEO SUD"}</span></div>
-  <div style="display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:12px;flex-shrink:0">
-    <span style="font-weight:600;font-size:11px">Présent :</span>
-    <span>${chk(pv.maitreOuvragePresent)} OUI</span>
-    <span>${chk(!pv.maitreOuvragePresent)} NON</span>
-  </div>
+<div style="display:flex;align-items:center;margin-bottom:10px;font-size:12px">
+  <span style="font-weight:600;font-size:11px;white-space:nowrap;min-width:120px">Maître d'œuvre :</span>
+  <span style="flex:1;padding:0 4px">${pv.maitroeuvre||"NEO SUD"}</span>
+  <span style="font-weight:600;font-size:11px;white-space:nowrap;margin-left:16px">Présent :</span>
+  <span style="margin-left:8px">${chk(pv.maitreOuvragePresent)} OUI</span>
+  <span style="margin-left:8px">${chk(!pv.maitreOuvragePresent)} NON</span>
 </div>
 
 <div class="field" style="margin-bottom:10px"><span class="field-label">Adresse chantier :</span><span class="field-value">${pv.adresseChantier||""}</span></div>
