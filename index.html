@@ -891,11 +891,11 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
   <div class="field"><span class="field-label">Date :</span><span class="field-value">${dateStr}</span></div>
-  <div class="field"><span class="field-label">Maître d'œuvre :</span><span class="field-value">${pv.maitroeuvre||"NEO SUD"}</span></div>
+  <div class="field"><span class="field-label">Maître d'ouvrage :</span><span class="field-value">${pv.maitreOuvrage||""}</span></div>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline;margin-bottom:10px">
-  <div class="field"><span class="field-label">Maître d'ouvrage :</span><span class="field-value">${pv.maitreOuvrage||""}</span></div>
+  <div class="field"><span class="field-label">Maître d'œuvre :</span><span class="field-value">${pv.maitroeuvre||"NEO SUD"}</span></div>
   <div class="checkbox-item" style="gap:10px;white-space:nowrap">
     <span>Présent :</span>
     <span>${chk(pv.maitreOuvragePresent)} OUI</span>
