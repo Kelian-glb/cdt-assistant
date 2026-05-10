@@ -129,7 +129,8 @@
       }
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -695,36 +696,54 @@ async function downloadPDF(fullHtml, filename) {
     } catch(e) { if (e.name === 'AbortError') return; }
   }
 
-  const parser = new DOMParser();
-  const parsed = parser.parseFromString(fullHtml, 'text/html');
-  const styles = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
+  const parsed = new DOMParser().parseFromString(fullHtml, 'text/html');
+  // Redirect body{} rules to the wrapper class so they apply to the div
+  const styles = Array.from(parsed.querySelectorAll('style'))
+    .map(s => s.textContent.replace(/\bbody\s*\{/g, '.pdf-wrapper{'))
+    .join('\n');
 
-  // Overlay to hide the render area from the user
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center';
   overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:18px 32px;font-size:15px;font-family:inherit">Génération du PDF…</div>';
   document.body.appendChild(overlay);
 
-  // Render at top-left — html2canvas requires the element to be in the document
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:#fff;color:#000;z-index:9999';
+  wrapper.className = 'pdf-wrapper';
+  wrapper.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:#fff';
   wrapper.innerHTML = `<style>${styles}</style>${parsed.body.innerHTML}`;
   document.body.appendChild(wrapper);
 
-  // Wait for images
+  // Wait for images to load
   await Promise.allSettled(Array.from(wrapper.querySelectorAll('img')).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 400));
 
   try {
-    const blob = await html2pdf().set({
-      margin: 0, filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#fff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { before: '.page-break' }
-    }).from(wrapper).outputPdf('blob');
+    const canvas = await html2canvas(wrapper, {
+      scale: 2, useCORS: true, allowTaint: false,
+      backgroundColor: '#ffffff', logging: false
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const ratio = canvas.width / pageW;
+    const pageHpx = Math.floor(pageH * ratio);
+
+    let y = 0;
+    while (y < canvas.height) {
+      if (y > 0) pdf.addPage();
+      const sliceH = Math.min(pageHpx, canvas.height - y);
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width; slice.height = sliceH;
+      slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageW, sliceH / ratio);
+      y += pageHpx;
+    }
+
+    const blob = pdf.output('blob');
 
     if (fileHandle) {
       const w = await fileHandle.createWritable();
