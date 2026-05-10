@@ -556,7 +556,6 @@ function useSupaPV(userId) {
     sousTraitant:     r.sous_traitant,
     maitroeuvre:      r.maitre_oeuvre,
     lot:              r.lot,
-    poste:            r.poste,
     statut:           r.statut,
     travauxRestants:  r.travaux_restants,
     travauxAReprendre:r.travaux_a_reprendre,
@@ -577,7 +576,6 @@ function useSupaPV(userId) {
       sous_traitant:     pv.sousTraitant,
       maitre_oeuvre:     pv.maitroeuvre,
       lot:               pv.lot,
-      poste:             pv.poste,
       statut:            pv.statut,
       travaux_restants:  pv.travauxRestants,
       travaux_a_reprendre: pv.travauxAReprendre,
@@ -811,9 +809,8 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
 <div class="field" style="margin-bottom:10px"><span class="field-label">Adresse chantier :</span><span class="field-value">${pv.adresseChantier||""}</span></div>
 <div class="field" style="margin-bottom:10px"><span class="field-label">Sous-traitant :</span><span class="field-value">${pv.sousTraitant||""}</span></div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
   <div class="field"><span class="field-label">Lot n° :</span><span class="field-value">${pv.lot||""}</span></div>
-  <div class="field"><span class="field-label">Poste :</span><span class="field-value">${pv.poste||""}</span></div>
   <div class="field"><span class="field-label">Entreprise :</span><span class="field-value">${pv.sousTraitant||""}</span></div>
 </div>
 
@@ -2643,7 +2640,7 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   const [pv, setPv] = useState({
     chantier:"", chantierId:null, date:today,
     maitreOuvrage:"", maitreOuvragePresent:true, adresseChantier:"",
-    maitroeuvre:"NEO SUD", sousTraitant:"", lot:"", poste:"",
+    maitroeuvre:"NEO SUD", sousTraitant:"", lot:"",
     statut:"sans_reserve", travauxRestants:"", travauxAReprendre:"",
     logoUrl:"",
   });
@@ -3018,7 +3015,6 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
                 {LOTS_PV.map(l => <option key={l.num} value={String(l.num)}>{l.num} – {l.label}</option>)}
               </select>
             </div>
-            <Input label="Poste" value={pv.poste} onChange={v => setPv(p=>({...p,poste:v}))} placeholder="Poste concerné" />
           </div>
 
           {/* Décision */}
