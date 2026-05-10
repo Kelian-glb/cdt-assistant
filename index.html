@@ -1029,7 +1029,7 @@ function Input({ label, value, onChange, type = "text", placeholder, style }) {
         style={{
           background: C.surface, color: C.text, padding: "10px 13px", fontSize: 15,
           outline: "none", fontFamily: "inherit",
-          border: `1.5px solid ${focus ? C.blue : C.border}`,
+          border: `1.5px solid ${focus ? C.blue : (value ? "transparent" : C.border)}`,
           borderRadius: 10,
           boxShadow: focus ? `0 0 0 3px ${C.blue}20` : "none",
         }}
@@ -1067,7 +1067,7 @@ function InputAutocomplete({ label, value, onChange, placeholder, history = [], 
         style={{
           background:C.surface, color:C.text, padding:"10px 13px", fontSize:15,
           outline:"none", fontFamily:"inherit",
-          border:`1.5px solid ${focus ? C.blue : C.border}`,
+          border:`1.5px solid ${focus ? C.blue : (value ? "transparent" : C.border)}`,
           borderRadius: showList ? "10px 10px 0 0" : 10,
           boxShadow: focus ? `0 0 0 3px ${C.blue}20` : "none",
         }}
@@ -2835,6 +2835,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
   );
 
   const inputStyle = { background:C.surface, color:C.text, padding:"10px 13px", fontSize:15, outline:"none", fontFamily:"inherit", border:`1.5px solid ${C.border}`, borderRadius:10 };
+  const iS = (val) => ({ ...inputStyle, border: `1.5px solid ${val ? "transparent" : C.border}` });
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16, height:"100%" }}>
@@ -2974,7 +2975,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
               <select value={pv.chantierId||""} onChange={e => {
                 const c = (chantiers||[]).find(x => String(x.id) === String(e.target.value));
                 setPv(p=>({...p, chantierId: c?.id||null, chantier: c?.client||c?.nom||"", adresseChantier: c?.commune||p.adresseChantier }));
-              }} style={inputStyle}>
+              }} style={iS(pv.chantierId)}>
                 <option value="">— Sélectionner —</option>
                 {(chantiers||[]).map(c => <option key={c.id} value={c.id}>{c.client||c.nom}</option>)}
               </select>
@@ -3013,14 +3014,14 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
           <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 2fr", gap:12 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
               <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Lot n°</label>
-              <select value={pv.lot} onChange={e => { const lot = e.target.value; const found = LOTS_PV.find(l => String(l.num) === lot); setPv(p=>({...p, lot, poste: found ? found.label : ""})); }} style={inputStyle}>
+              <select value={pv.lot} onChange={e => { const lot = e.target.value; const found = LOTS_PV.find(l => String(l.num) === lot); setPv(p=>({...p, lot, poste: found ? found.label : ""})); }} style={iS(pv.lot)}>
                 <option value="">— Lot —</option>
                 {LOTS_PV.map(l => <option key={l.num} value={String(l.num)}>{l.num} – {l.label}</option>)}
               </select>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
               <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Poste</label>
-              <input value={pv.poste} readOnly style={{...inputStyle, background: C.bg, color: C.muted, cursor:"default"}} placeholder="Sélectionner un lot" />
+              <input value={pv.poste} readOnly style={{...iS(pv.poste), background: C.bg, color: C.muted, cursor:"default"}} placeholder="Sélectionner un lot" />
             </div>
           </div>
 
