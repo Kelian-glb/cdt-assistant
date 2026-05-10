@@ -3081,8 +3081,9 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
           {/* ── Section 2 : Parties ── */}
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
             <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:".06em" }}>Parties</div>
+            <Input label="Maître d'ouvrage" value={pv.maitreOuvrage} onChange={v => setPv(p=>({...p,maitreOuvrage:v}))} placeholder="Nom du maître d'ouvrage" />
             <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"2fr 1fr", gap:12, alignItems:"end" }}>
-              <Input label="Maître d'ouvrage" value={pv.maitreOuvrage} onChange={v => setPv(p=>({...p,maitreOuvrage:v}))} placeholder="Nom du maître d'ouvrage" />
+              <Input label="Maître d'œuvre" value={pv.maitroeuvre} onChange={v => setPv(p=>({...p,maitroeuvre:v}))} placeholder="NEO SUD" />
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 <label style={{ fontSize:12, color:C.muted, fontWeight:500 }}>Présent</label>
                 <div style={{ display:"flex", gap:8 }}>
@@ -3097,10 +3098,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
                 </div>
               </div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:12 }}>
-              <Input label="Maître d'œuvre" value={pv.maitroeuvre} onChange={v => setPv(p=>({...p,maitroeuvre:v}))} placeholder="NEO SUD" />
-              <InputAutocomplete label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" history={stHistory.history} onAddToHistory={stHistory.add} onRemoveFromHistory={stHistory.remove} />
-            </div>
+            <InputAutocomplete label="Sous-traitant / Entreprise" value={pv.sousTraitant} onChange={v => setPv(p=>({...p,sousTraitant:v}))} placeholder="Nom de l'entreprise" history={stHistory.history} onAddToHistory={stHistory.add} onRemoveFromHistory={stHistory.remove} />
           </div>
 
           {/* ── Section 3 : Lot ── */}
