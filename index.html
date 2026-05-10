@@ -729,18 +729,37 @@ async function downloadPDF(fullHtml, filename) {
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = canvas.width / pageW;
-    const pageHpx = Math.floor(pageH * ratio);
+    const pxPerMm = canvas.width / pageW;
+    const pageHpx = Math.floor(pageH * pxPerMm);
 
-    let y = 0;
-    while (y < canvas.height) {
-      if (y > 0) pdf.addPage();
-      const sliceH = Math.min(pageHpx, canvas.height - y);
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width; slice.height = sliceH;
-      slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageW, sliceH / ratio);
-      y += pageHpx;
+    // Build section boundaries from .page-break elements, fall back to A4 slicing
+    const breakEls = Array.from(wrapper.querySelectorAll('.page-break'));
+    const breakPositions = breakEls
+      .map(el => Math.floor(el.offsetTop * 2)) // scale:2 from html2canvas
+      .filter(b => b > 0 && b < canvas.height);
+    const bounds = [];
+    let prev = 0;
+    for (const b of breakPositions) { bounds.push([prev, b]); prev = b; }
+    bounds.push([prev, canvas.height]);
+
+    const addSlice = (start, end) => {
+      const h = end - start;
+      const sl = document.createElement('canvas');
+      sl.width = canvas.width; sl.height = h;
+      sl.getContext('2d').drawImage(canvas, 0, start, canvas.width, h, 0, 0, canvas.width, h);
+      pdf.addImage(sl.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageW, h / pxPerMm);
+    };
+
+    let firstPage = true;
+    for (const [sStart, sEnd] of bounds) {
+      let y = sStart;
+      while (y < sEnd) {
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
+        const sliceEnd = Math.min(y + pageHpx, sEnd);
+        addSlice(y, sliceEnd);
+        y += pageHpx;
+      }
     }
 
     const blob = pdf.output('blob');
