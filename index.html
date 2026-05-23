@@ -328,34 +328,61 @@ function useLocalStorage(key, defaultValue) {
   return [value, setValue];
 }
 
+// ── Support hors-connexion ──────────────────────────────────────────────────
+const _ldb = {
+  get: (k) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const _ckey = (uid, tbl) => `_c_${uid}_${tbl}`;
+
+function useOnlineStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const go  = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', go);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', go); window.removeEventListener('offline', off); };
+  }, []);
+  return online;
+}
+
 // ── Supabase data hooks ─────────────────────────────────────────────────────
 function useSupaChantiers(userId) {
   const [chantiers, setChantiers] = useState(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
+    const key = _ckey(userId, 'chantiers');
+    const cached = _ldb.get(key);
+    if (cached) setChantiers(cached);
     const { data } = await supabase.from("chantiers").select("*").eq("user_id", userId).order("created_at", { ascending: false });
-    setChantiers(data || []);
+    if (data) { setChantiers(data); _ldb.set(key, data); }
+    else if (!cached) setChantiers([]);
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
 
+  const _setCache = (fn) => setChantiers(prev => {
+    const next = fn(prev); _ldb.set(_ckey(userId, 'chantiers'), next); return next;
+  });
+
   const saveNew = async (c) => {
     const { nom, client, commune, statut, phase, notes, checks, rappels, documents, budget, prochaine_action } = c;
     const { data } = await supabase.from("chantiers").insert({ nom, client, commune, statut, phase, notes, checks, rappels, documents: documents || [], budget, prochaine_action, user_id: userId }).select().single();
-    setChantiers(prev => [data, ...(prev||[])]);
+    _setCache(prev => [data, ...(prev||[])]);
     return data;
   };
 
   const update = async (updated) => {
     const { nom, client, commune, statut, phase, notes, checks, rappels, documents, budget, prochaine_action } = updated;
     await supabase.from("chantiers").update({ nom, client, commune, statut, phase, notes, checks, rappels, documents, budget, prochaine_action, updated_at: new Date().toISOString() }).eq("id", updated.id);
-    setChantiers(prev => (prev||[]).map(c => c.id === updated.id ? updated : c));
+    _setCache(prev => (prev||[]).map(c => c.id === updated.id ? updated : c));
   };
 
   const del = async (id) => {
     await supabase.from("chantiers").delete().eq("id", id);
-    setChantiers(prev => (prev||[]).filter(c => c.id !== id));
+    _setCache(prev => (prev||[]).filter(c => c.id !== id));
   };
 
   return { chantiers, setChantiers, load, saveNew, update, del };
@@ -367,8 +394,12 @@ function useSupaSettings(userId) {
   useEffect(() => {
     if (!userId) return;
     (async () => {
+      const key = _ckey(userId, 'settings');
+      const cached = _ldb.get(key);
+      if (cached) setSettings(cached);
       const { data } = await supabase.from("user_settings").select("*").eq("user_id", userId).maybeSingle();
-      setSettings(data || { phases: null, modeles_checklist: {} });
+      if (data) { setSettings(data); _ldb.set(key, data); }
+      else if (!cached) setSettings({ phases: null, modeles_checklist: {} });
     })();
   }, [userId]);
 
@@ -505,12 +536,19 @@ function useSupaEntreprise(userId) {
 
   useEffect(() => {
     if (!userId) return;
-    supabase.from("entreprise").select("*").eq("user_id", userId).maybeSingle()
-      .then(({ data }) => setEntreprise(data || {}));
+    (async () => {
+      const key = _ckey(userId, 'entreprise');
+      const cached = _ldb.get(key);
+      if (cached) setEntreprise(cached);
+      const { data } = await supabase.from("entreprise").select("*").eq("user_id", userId).maybeSingle();
+      if (data) { setEntreprise(data); _ldb.set(key, data); }
+      else if (!cached) setEntreprise({});
+    })();
   }, [userId]);
 
   const save = async (data) => {
     setEntreprise(data);
+    _ldb.set(_ckey(userId, 'entreprise'), data);
     const { data: existing } = await supabase.from("entreprise").select("id").eq("user_id", userId).maybeSingle();
     const payload = { ...data, user_id: userId, updated_at: new Date().toISOString() };
     if (existing) {
@@ -529,21 +567,31 @@ function useSupaCR(userId) {
 
   useEffect(() => {
     if (!userId) return;
-    supabase.from("cr_reunions").select("*").eq("user_id", userId).order("created_at", { ascending: false })
-      .then(({ data }) => setCrs(data || []));
+    (async () => {
+      const key = _ckey(userId, 'cr_reunions');
+      const cached = _ldb.get(key);
+      if (cached) setCrs(cached);
+      const { data } = await supabase.from("cr_reunions").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+      if (data) { setCrs(data); _ldb.set(key, data); }
+      else if (!cached) setCrs([]);
+    })();
   }, [userId]);
+
+  const _setCrCache = (fn) => setCrs(prev => {
+    const next = fn(prev); _ldb.set(_ckey(userId, 'cr_reunions'), next); return next;
+  });
 
   const saveCR = async (cr) => {
     const payload = { ...cr, user_id: userId };
     delete payload.id;
     const { data } = await supabase.from("cr_reunions").insert(payload).select().single();
-    setCrs(prev => [data, ...(prev||[])]);
+    _setCrCache(prev => [data, ...(prev||[])]);
     return data;
   };
 
   const delCR = async (id) => {
     await supabase.from("cr_reunions").delete().eq("id", id);
-    setCrs(prev => (prev||[]).filter(c => c.id !== id));
+    _setCrCache(prev => (prev||[]).filter(c => c.id !== id));
   };
 
   return { crs, saveCR, delCR };
@@ -569,9 +617,19 @@ function useSupaPV(userId) {
 
   useEffect(() => {
     if (!userId) return;
-    supabase.from("pv_receptions").select("*").eq("user_id", userId).order("created_at", { ascending: false })
-      .then(({ data }) => setPvs((data || []).map(_map)));
+    (async () => {
+      const key = _ckey(userId, 'pv_receptions');
+      const cached = _ldb.get(key);
+      if (cached) setPvs(cached);
+      const { data } = await supabase.from("pv_receptions").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+      if (data) { const mapped = data.map(_map); setPvs(mapped); _ldb.set(key, mapped); }
+      else if (!cached) setPvs([]);
+    })();
   }, [userId]);
+
+  const _setPvCache = (fn) => setPvs(prev => {
+    const next = fn(prev); _ldb.set(_ckey(userId, 'pv_receptions'), next); return next;
+  });
 
   const savePV = async (pv) => {
     const payload = {
@@ -590,13 +648,13 @@ function useSupaPV(userId) {
     const { data, error } = await supabase.from("pv_receptions").insert(payload).select().single();
     if (error || !data) return null;
     const mapped = _map(data);
-    setPvs(prev => [mapped, ...(prev||[])]);
+    _setPvCache(prev => [mapped, ...(prev||[])]);
     return mapped;
   };
 
   const delPV = async (id) => {
     await supabase.from("pv_receptions").delete().eq("id", id);
-    setPvs(prev => (prev||[]).filter(p => p.id !== id));
+    _setPvCache(prev => (prev||[]).filter(p => p.id !== id));
   };
 
   return { pvs, savePV, delPV };
@@ -608,17 +666,24 @@ function useSupaMetres(userId) {
 
   useEffect(() => {
     if (!userId) return;
-    supabase.from("metres").select("*").eq("user_id", userId).maybeSingle()
-      .then(({ data }) => {
+    (async () => {
+      const key = _ckey(userId, 'metres');
+      const cached = _ldb.get(key);
+      if (cached) setItems(cached);
+      const { data } = await supabase.from("metres").select("*").eq("user_id", userId).maybeSingle();
+      if (data !== undefined) {
         const raw = data?.items || [];
         // migration : anciens items avaient desc/qte/pu, nouveaux ont nom/prix
         const migrated = raw.map(i => i.nom !== undefined ? i : { id: i.id, nom: i.desc || "", prix: i.pu || "" });
         setItems(migrated);
-      });
+        _ldb.set(key, migrated);
+      } else if (!cached) setItems([]);
+    })();
   }, [userId]);
 
   const save = async (newItems) => {
     setItems(newItems);
+    _ldb.set(_ckey(userId, 'metres'), newItems);
     const { data: existing } = await supabase.from("metres").select("id").eq("user_id", userId).maybeSingle();
     const payload = { items: newItems, user_id: userId, updated_at: new Date().toISOString() };
     if (existing) {
@@ -711,7 +776,8 @@ async function downloadPDF(fullHtml, filename) {
 
   const wrapper = document.createElement('div');
   wrapper.className = 'pdf-wrapper';
-  wrapper.style.cssText = 'position:absolute;top:0;left:0;width:794px;background:#fff';
+  // Hors-écran à gauche pour éviter l'interaction avec le viewport mobile
+  wrapper.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;background:#fff;overflow:visible;pointer-events:none';
   wrapper.innerHTML = `<style>${styles}</style>${parsed.body.innerHTML}`;
   document.body.appendChild(wrapper);
 
@@ -719,12 +785,15 @@ async function downloadPDF(fullHtml, filename) {
   await Promise.allSettled(Array.from(wrapper.querySelectorAll('img')).map(img =>
     img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 500));
 
   try {
     const canvas = await html2canvas(wrapper, {
       scale: 2, useCORS: true, allowTaint: false,
-      backgroundColor: '#ffffff', logging: false
+      backgroundColor: '#ffffff', logging: false,
+      // Force le rendu à largeur A4 quelle que soit la largeur du viewport (mobile)
+      windowWidth: 794,
+      scrollX: 0, scrollY: 0,
     });
 
     const { jsPDF } = window.jspdf;
@@ -734,10 +803,11 @@ async function downloadPDF(fullHtml, filename) {
     const pxPerMm = canvas.width / pageW;
     const pageHpx = Math.floor(pageH * pxPerMm);
 
-    // Build section boundaries from .page-break elements, fall back to A4 slicing
+    // Détection des sauts de page via getBoundingClientRect (plus fiable sur mobile)
+    const wrapperTop = wrapper.getBoundingClientRect().top;
     const breakEls = Array.from(wrapper.querySelectorAll('.page-break'));
     const breakPositions = breakEls
-      .map(el => Math.floor(el.offsetTop * 2)) // scale:2 from html2canvas
+      .map(el => Math.floor((el.getBoundingClientRect().top - wrapperTop) * 2))
       .filter(b => b > 0 && b < canvas.height);
     const bounds = [];
     let prev = 0;
@@ -4254,23 +4324,74 @@ function CalcEnduit() {
 
 // ── TAB CALCULS ────────────────────────────────────────────────────────────
 // ── MÉTRÉS / QUANTITATIF (Supabase) ───────────────────────────────────────
+
+const CATS_PRIX = [
+  { id:"sanitaire",   label:"Sanitaire",   icon:"🚿" },
+  { id:"electricite", label:"Électricité", icon:"⚡" },
+  { id:"carrelage",   label:"Carrelage",   icon:"⬜" },
+  { id:"platrerie",   label:"Plâtrerie",   icon:"🏗️" },
+  { id:"menuiserie",  label:"Menuiserie",  icon:"🪵" },
+  { id:"peinture",    label:"Peinture",    icon:"🎨" },
+  { id:"maconnerie",  label:"Maçonnerie",  icon:"🧱" },
+  { id:"general",     label:"Général",     icon:"📦" },
+];
+const SOUS_CATS_PRIX = [
+  { id:"fourniture", label:"Fourniture" },
+  { id:"mo",         label:"Main d'œuvre" },
+];
+
 function CalcPrixList({ supaMetres }) {
   const { items, save } = supaMetres;
-  const [query, setQuery]   = useState("");
-  const [draft, setDraft]   = useState({ nom:"", prix:"" });
-  const [searchFocus, setSearchFocus] = useState(false);
+  const [selCat,  setSelCat]  = useState(null);
+  const [selSous, setSelSous] = useState(null);
+  const [query,   setQuery]   = useState("");
+  const [draft, setDraft] = useState({ nom:"", prix:"", categorie:"sanitaire", sousCategorie:"fourniture" });
+  const [customCats, setCustomCats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('_prix_custom_cats')||'[]'); } catch { return []; }
+  });
+  const [newCatModal, setNewCatModal] = useState(false);
+  const [newCatName,  setNewCatName]  = useState("");
 
-  const filtered = (items || []).filter(i =>
-    !query.trim() || (i.nom||"").toLowerCase().includes(query.trim().toLowerCase())
-  );
+  // Quand on change de catégorie, pré-remplir le formulaire
+  useEffect(() => { if (selCat) setDraft(d => ({ ...d, categorie: selCat })); }, [selCat]);
+
+  // Migration : anciens items sans catégorie → Général / Fourniture
+  const allItems = (items || []).map(i => ({
+    ...i,
+    categorie:     i.categorie     || "general",
+    sousCategorie: i.sousCategorie || "fourniture",
+  }));
+
+  const allCats = [...CATS_PRIX, ...customCats];
+
+  const filtered = allItems.filter(i => {
+    const matchCat  = !selCat  || i.categorie    === selCat;
+    const matchSous = !selSous || i.sousCategorie === selSous;
+    const matchQ    = !query.trim() || (i.nom||"").toLowerCase().includes(query.trim().toLowerCase());
+    return matchCat && matchSous && matchQ;
+  });
+
+  const showGroups = selCat && !selSous && !query.trim();
 
   const add = () => {
     if (!draft.nom.trim()) return;
-    save([...items, { id: Date.now(), nom: draft.nom.trim(), prix: draft.prix }]);
-    setDraft({ nom:"", prix:"" });
+    save([...allItems, { id:Date.now(), nom:draft.nom.trim(), prix:draft.prix, categorie:draft.categorie, sousCategorie:draft.sousCategorie }]);
+    setDraft(d => ({ ...d, nom:"", prix:"" }));
   };
 
-  const del = (id) => save(items.filter(i => i.id !== id));
+  const del = (id) => save(allItems.filter(i => i.id !== id));
+
+  const addCustomCat = () => {
+    if (!newCatName.trim()) return;
+    const id = "custom_" + newCatName.trim().toLowerCase().replace(/[^a-z0-9]/g,"_").slice(0,20);
+    const cat = { id, label:newCatName.trim(), icon:"📦" };
+    const updated = [...customCats, cat];
+    setCustomCats(updated);
+    localStorage.setItem('_prix_custom_cats', JSON.stringify(updated));
+    setDraft(d => ({ ...d, categorie:id }));
+    setSelCat(id); setSelSous(null);
+    setNewCatName(""); setNewCatModal(false);
+  };
 
   const inputS = (extra={}) => ({
     background:"#fff", border:`1.5px solid ${C.border}`, borderRadius:10,
@@ -4278,105 +4399,231 @@ function CalcPrixList({ supaMetres }) {
     outline:"none", boxSizing:"border-box", ...extra,
   });
 
+  /* ── Pill catégorie ── */
+  const CatPill = ({ id, label, icon }) => {
+    const count = id ? allItems.filter(i=>i.categorie===id).length : allItems.length;
+    const active = selCat === id;
+    return (
+      <button onClick={() => { setSelCat(id); setSelSous(null); setQuery(""); }}
+        style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"6px 13px",
+          borderRadius:99, flexShrink:0, whiteSpace:"nowrap", cursor:"pointer", transition:"all .15s",
+          background: active ? C.text : "transparent",
+          color:       active ? "#fff" : C.muted,
+          border:     `1.5px solid ${active ? C.text : C.border}`,
+          fontFamily:"inherit", fontSize:12, fontWeight:600 }}>
+        {icon && <span style={{ fontSize:13 }}>{icon}</span>}
+        {label}
+        {count > 0 && (
+          <span style={{ fontSize:10, fontWeight:700, borderRadius:99, padding:"1px 6px",
+            background: active ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.07)" }}>
+            {count}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  /* ── Pill sous-catégorie ── */
+  const SousPill = ({ id, label }) => {
+    const active = selSous === id;
+    return (
+      <button onClick={() => setSelSous(id)}
+        style={{ padding:"5px 13px", borderRadius:99, flexShrink:0, cursor:"pointer", transition:"all .15s",
+          background: active ? C.blue : "transparent",
+          color:       active ? "#fff" : C.muted,
+          border:     `1.5px solid ${active ? C.blue : C.border}`,
+          fontFamily:"inherit", fontSize:11, fontWeight:600 }}>
+        {label}
+      </button>
+    );
+  };
+
+  /* ── Ligne d'article ── */
+  const ItemRow = ({ item, idx, total }) => (
+    <div style={{ display:"flex", alignItems:"center", padding:"11px 16px",
+      background: idx%2===0 ? "#fff" : C.surface2,
+      borderBottom: idx<total-1 ? `1px solid ${C.border}` : "none" }}>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:500, color:C.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+          {item.nom}
+        </div>
+        {!selCat && (
+          <div style={{ display:"flex", gap:4, marginTop:3 }}>
+            <span style={{ fontSize:10, padding:"1px 7px", borderRadius:99, background:"#eff6ff", color:C.blue, fontWeight:600 }}>
+              {allCats.find(c=>c.id===item.categorie)?.label || item.categorie}
+            </span>
+            <span style={{ fontSize:10, padding:"1px 7px", borderRadius:99, background:C.surface2, color:C.muted, fontWeight:600 }}>
+              {SOUS_CATS_PRIX.find(s=>s.id===item.sousCategorie)?.label || item.sousCategorie}
+            </span>
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize:14, fontWeight:700, color:C.text, marginRight:14, flexShrink:0 }}>
+        {parseFloat(item.prix||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})} €
+      </div>
+      <button onClick={() => del(item.id)}
+        style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:18, lineHeight:1, padding:"2px 4px", borderRadius:6, opacity:.6, flexShrink:0 }}
+        onMouseEnter={e=>{e.currentTarget.style.color=C.red;e.currentTarget.style.opacity="1"}}
+        onMouseLeave={e=>{e.currentTarget.style.color=C.muted;e.currentTarget.style.opacity=".6"}}>
+        ×
+      </button>
+    </div>
+  );
+
+  /* ── Groupe (fourniture / MO) ── */
+  const SubGroup = ({ gItems, label }) => {
+    if (!gItems.length) return null;
+    return (
+      <>
+        <div style={{ padding:"7px 16px", fontSize:10, fontWeight:700, color:C.muted,
+          letterSpacing:".07em", textTransform:"uppercase", background:C.surface2,
+          borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between" }}>
+          <span>{label}</span><span>{gItems.length}</span>
+        </div>
+        {gItems.map((item,idx) => <ItemRow key={item.id} item={item} idx={idx} total={gItems.length} />)}
+      </>
+    );
+  };
+
   return (
     <CalcCard title="">
       {/* En-tête */}
-      <div style={{ marginBottom:20 }}>
+      <div style={{ marginBottom:16 }}>
         <div style={{ fontSize:17, fontWeight:700, color:C.text, letterSpacing:"-.01em" }}>Liste de prix</div>
         <div style={{ fontSize:12, color:C.muted, marginTop:3 }}>
-          {items.length} produit{items.length !== 1 ? "s" : ""} enregistré{items.length !== 1 ? "s" : ""} · synchronisé avec votre compte
+          {allItems.length} article{allItems.length!==1?"s":""} · synchronisé avec votre compte
         </div>
       </div>
 
-      {/* Barre de recherche */}
-      <div style={{ position:"relative", marginBottom:16 }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={searchFocus ? C.text : C.muted}
+      {/* Barre catégories (scroll horizontal mobile) */}
+      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:6, marginBottom:8,
+        scrollbarWidth:"none", WebkitOverflowScrolling:"touch" }}>
+        <CatPill id={null} label="Tous" icon={null} />
+        {allCats.map(c => <CatPill key={c.id} id={c.id} label={c.label} icon={c.icon} />)}
+        <button onClick={() => setNewCatModal(true)}
+          style={{ padding:"6px 12px", borderRadius:99, background:"transparent", color:C.blue,
+            border:`1.5px dashed ${C.blue}`, fontFamily:"inherit", fontSize:12, fontWeight:600,
+            cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+          + Catégorie
+        </button>
+      </div>
+
+      {/* Sous-catégories */}
+      {selCat && (
+        <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap" }}>
+          <SousPill id={null} label="Toutes" />
+          {SOUS_CATS_PRIX.map(s => <SousPill key={s.id} id={s.id} label={s.label} />)}
+        </div>
+      )}
+
+      {/* Recherche */}
+      <div style={{ position:"relative", marginBottom:14 }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.muted}
           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          style={{ position:"absolute", left:13, top:"50%", transform:"translateY(-50%)", pointerEvents:"none", transition:"stroke .15s" }}>
+          style={{ position:"absolute", left:13, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}>
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onFocus={() => setSearchFocus(true)}
-          onBlur={() => setSearchFocus(false)}
-          placeholder="Rechercher un produit ou matériau..."
-          style={{ ...inputS(), width:"100%", paddingLeft:40,
-            boxShadow: searchFocus ? `0 0 0 3px ${C.text}15` : "none",
-            border: `1.5px solid ${searchFocus ? C.text+"50" : C.border}`, transition:"border-color .15s, box-shadow .15s" }}
-        />
+        <input value={query} onChange={e=>setQuery(e.target.value)}
+          placeholder="Rechercher un article..."
+          style={{ ...inputS(), width:"100%", paddingLeft:40 }} />
         {query && (
-          <button onClick={() => setQuery("")}
+          <button onClick={()=>setQuery("")}
             style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
-              background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:18, lineHeight:1, padding:0 }}>
-            ×
-          </button>
+              background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:18, lineHeight:1, padding:0 }}>×</button>
         )}
       </div>
 
       {/* Liste */}
-      <div style={{ display:"flex", flexDirection:"column", gap:1, borderRadius:14, overflow:"hidden",
-        border:`1px solid ${C.border}`, marginBottom:20, minHeight:60 }}>
+      <div style={{ borderRadius:14, overflow:"hidden", border:`1px solid ${C.border}`, marginBottom:20, minHeight:60 }}>
         {filtered.length === 0 ? (
           <div style={{ padding:"28px 20px", textAlign:"center", color:C.muted, fontSize:13 }}>
-            {query ? `Aucun résultat pour « ${query} »` : "Aucun prix enregistré — ajoutez-en un ci-dessous."}
+            {query ? `Aucun résultat pour « ${query} »` : "Aucun article dans cette catégorie."}
           </div>
-        ) : filtered.map((item, idx) => (
-          <div key={item.id}
-            style={{ display:"flex", alignItems:"center", padding:"12px 16px",
-              background: idx % 2 === 0 ? "#fff" : C.surface2,
-              borderBottom: idx < filtered.length-1 ? `1px solid ${C.border}` : "none" }}>
-            <div style={{ flex:1, fontSize:13, fontWeight:500, color:C.text }}>{item.nom}</div>
-            <div style={{ fontSize:14, fontWeight:700, color:C.text, marginRight:14 }}>
-              {parseFloat(item.prix||0).toLocaleString("fr-FR", { minimumFractionDigits:2, maximumFractionDigits:2 })} €
-            </div>
-            <button onClick={() => del(item.id)}
-              style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:18,
-                lineHeight:1, padding:"2px 4px", borderRadius:6, opacity:.6 }}
-              onMouseEnter={e => { e.currentTarget.style.color=C.red; e.currentTarget.style.opacity="1"; }}
-              onMouseLeave={e => { e.currentTarget.style.color=C.muted; e.currentTarget.style.opacity=".6"; }}>
-              ×
-            </button>
-          </div>
-        ))}
+        ) : showGroups ? (
+          <>
+            <SubGroup gItems={filtered.filter(i=>i.sousCategorie==="fourniture")} label="Fourniture" />
+            <SubGroup gItems={filtered.filter(i=>i.sousCategorie==="mo")} label="Main d'œuvre" />
+          </>
+        ) : (
+          filtered.map((item,idx) => <ItemRow key={item.id} item={item} idx={idx} total={filtered.length} />)
+        )}
       </div>
 
       {/* Formulaire d'ajout */}
       <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:18 }}>
-        <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".07em", textTransform:"uppercase", marginBottom:10 }}>
-          Ajouter un prix
+        <div style={{ fontSize:11, fontWeight:600, color:C.muted, letterSpacing:".07em", textTransform:"uppercase", marginBottom:12 }}>
+          Ajouter un article
         </div>
-        <div className="m-add-row" style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <input
-            value={draft.nom}
-            onChange={e => setDraft(d => ({ ...d, nom: e.target.value }))}
-            onKeyDown={e => e.key === "Enter" && add()}
-            placeholder="Nom du produit ou matériau..."
-            style={{ ...inputS(), flex:1 }}
-          />
-          <div className="m-prix-wrap" style={{ position:"relative", flexShrink:0 }}>
-            <input
-              type="number"
-              value={draft.prix}
-              onChange={e => setDraft(d => ({ ...d, prix: e.target.value }))}
-              onKeyDown={e => e.key === "Enter" && add()}
-              placeholder="0.00"
-              min="0"
-              style={{ ...inputS(), width:110, paddingRight:26, textAlign:"right" }}
-            />
-            <span style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
-              color:C.muted, fontSize:13, pointerEvents:"none" }}>€</span>
+        {/* Catégorie + sous-catégorie */}
+        <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
+          <select value={draft.categorie} onChange={e=>setDraft(d=>({...d,categorie:e.target.value}))}
+            style={{ ...inputS(), flex:1, minWidth:150, cursor:"pointer" }}>
+            {allCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+          </select>
+          <div style={{ display:"flex", borderRadius:10, overflow:"hidden", border:`1.5px solid ${C.border}`, flexShrink:0 }}>
+            {SOUS_CATS_PRIX.map(s => (
+              <button key={s.id} onClick={()=>setDraft(d=>({...d,sousCategorie:s.id}))}
+                style={{ padding:"9px 14px", fontSize:12, fontWeight:600, fontFamily:"inherit",
+                  background: draft.sousCategorie===s.id ? C.text : "#fff",
+                  color:       draft.sousCategorie===s.id ? "#fff" : C.muted,
+                  border:"none", cursor:"pointer", transition:"all .15s", whiteSpace:"nowrap" }}>
+                {s.label}
+              </button>
+            ))}
           </div>
-          <button
-            onClick={add}
-            disabled={!draft.nom.trim()}
-            style={{ background: draft.nom.trim() ? C.text : C.border, color:"#fff", border:"none",
-              borderRadius:10, padding:"10px 18px", fontSize:13, fontWeight:600, cursor: draft.nom.trim() ? "pointer" : "default",
-              fontFamily:"inherit", flexShrink:0, transition:"background .15s", whiteSpace:"nowrap" }}>
+        </div>
+        {/* Nom + Prix + Bouton */}
+        <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+          <input value={draft.nom} onChange={e=>setDraft(d=>({...d,nom:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&add()}
+            placeholder="Nom du produit ou prestation..."
+            style={{ ...inputS(), flex:1, minWidth:160 }} />
+          <div style={{ position:"relative", flexShrink:0 }}>
+            <input type="number" value={draft.prix} onChange={e=>setDraft(d=>({...d,prix:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&add()}
+              placeholder="0.00" min="0"
+              style={{ ...inputS(), width:110, paddingRight:26, textAlign:"right" }} />
+            <span style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", color:C.muted, fontSize:13, pointerEvents:"none" }}>€</span>
+          </div>
+          <button onClick={add} disabled={!draft.nom.trim()}
+            style={{ background:draft.nom.trim()?C.text:C.border, color:"#fff", border:"none",
+              borderRadius:10, padding:"10px 18px", fontSize:13, fontWeight:600,
+              cursor:draft.nom.trim()?"pointer":"default", fontFamily:"inherit",
+              flexShrink:0, transition:"background .15s", whiteSpace:"nowrap" }}>
             + Ajouter
           </button>
         </div>
       </div>
+
+      {/* Modal nouvelle catégorie */}
+      {newCatModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:9000, background:"rgba(0,0,0,.45)",
+          display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
+          onClick={()=>setNewCatModal(false)}>
+          <div style={{ background:"#fff", borderRadius:16, padding:24, width:"100%", maxWidth:380,
+            boxShadow:"0 8px 32px rgba(0,0,0,.2)" }}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{ fontWeight:700, fontSize:16, marginBottom:4 }}>Nouvelle catégorie</div>
+            <div style={{ fontSize:13, color:C.muted, marginBottom:16 }}>Donnez un nom à votre catégorie personnalisée.</div>
+            <input value={newCatName} onChange={e=>setNewCatName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustomCat()}
+              placeholder="Ex: Isolation, Toiture, VMC..."
+              autoFocus
+              style={{ ...inputS(), width:"100%", marginBottom:16, boxSizing:"border-box" }} />
+            <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+              <button onClick={()=>setNewCatModal(false)}
+                style={{ padding:"9px 18px", borderRadius:10, border:`1.5px solid ${C.border}`,
+                  background:"#fff", color:C.text, fontFamily:"inherit", fontSize:13, cursor:"pointer" }}>
+                Annuler
+              </button>
+              <button onClick={addCustomCat} disabled={!newCatName.trim()}
+                style={{ padding:"9px 18px", borderRadius:10, border:"none",
+                  background:newCatName.trim()?C.text:C.border, color:"#fff",
+                  fontFamily:"inherit", fontSize:13, fontWeight:600,
+                  cursor:newCatName.trim()?"pointer":"default" }}>
+                Créer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </CalcCard>
   );
 }
@@ -5020,6 +5267,41 @@ function EntrepriseModal({ isOpen, onClose, supaEntreprise }) {
   );
 }
 
+// ── Bandeau hors-connexion ───────────────────────────────────────────────────
+function OfflineBanner({ isOnline }) {
+  const [show, setShow]       = useState(!isOnline);
+  const [justBack, setJustBack] = useState(false);
+  const prevRef = useRef(isOnline);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setShow(true); setJustBack(false);
+    } else if (prevRef.current === false) {
+      setJustBack(true); setShow(true);
+      const t = setTimeout(() => setShow(false), 3500);
+      return () => clearTimeout(t);
+    }
+    prevRef.current = isOnline;
+  }, [isOnline]);
+
+  if (!show) return null;
+  return (
+    <div style={{
+      position:'fixed', top:0, left:0, right:0, zIndex:9999,
+      background: justBack ? '#16a34a' : '#d97706',
+      color:'#fff', padding:'10px 16px',
+      textAlign:'center', fontSize:13, fontWeight:600,
+      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+      boxShadow:'0 2px 8px rgba(0,0,0,.2)',
+    }}>
+      {justBack
+        ? <><span>✅</span> Connexion rétablie — données synchronisées</>
+        : <><span>📡</span> Hors connexion — données locales affichées, modifications non sauvegardées</>
+      }
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 function App() {
   const [oauthToken] = useState(() => {
@@ -5030,6 +5312,7 @@ function App() {
   const [tab, setTab] = useState(() => oauthToken ? "planning" : "dashboard");
   const [user, setUser] = useState(undefined); // undefined = loading, null = non connecté
   const mob = useIsMobile();
+  const isOnline = useOnlineStatus();
 
   const supaChantiers  = useSupaChantiers(user?.id);
   const supaSettings   = useSupaSettings(user?.id);
@@ -5077,6 +5360,7 @@ function App() {
 
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:"#f5f4f0", fontFamily:"'Outfit',sans-serif" }}>
+      <OfflineBanner isOnline={isOnline} />
       <EntrepriseModal isOpen={entModalOpen} onClose={() => setEntModalOpen(false)} supaEntreprise={supaEntreprise} />
 
       {mob && sidebarOpen && (
