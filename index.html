@@ -652,12 +652,32 @@ function useSupaPV(userId) {
     return mapped;
   };
 
+  const updatePV = async (pv) => {
+    const payload = {
+      chantier_id:         pv.chantierId,
+      date:                pv.date,
+      sous_traitant:       pv.sousTraitant,
+      maitre_oeuvre:       pv.maitroeuvre,
+      lot:                 pv.lot,
+      poste:               pv.poste,
+      statut:              pv.statut,
+      travaux_restants:    pv.travauxRestants,
+      travaux_a_reprendre: pv.travauxAReprendre,
+      logo_url:            pv.logoUrl,
+    };
+    const { data, error } = await supabase.from("pv_receptions").update(payload).eq("id", pv.id).select().single();
+    if (error || !data) return null;
+    const mapped = _map(data);
+    _setPvCache(prev => (prev||[]).map(p => p.id === mapped.id ? mapped : p));
+    return mapped;
+  };
+
   const delPV = async (id) => {
     await supabase.from("pv_receptions").delete().eq("id", id);
     _setPvCache(prev => (prev||[]).filter(p => p.id !== id));
   };
 
-  return { pvs, savePV, delPV };
+  return { pvs, savePV, updatePV, delPV };
 }
 
 // ── Hook Métrés ────────────────────────────────────────────────────────────
@@ -2782,7 +2802,7 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
   const { crs, saveCR, delCR } = supaCR;
-  const { pvs, savePV, delPV } = supaPV || {};
+  const { pvs, savePV, updatePV, delPV } = supaPV || {};
   const { chantiers, update: updateChantier } = supaChantiers;
   const { entreprise, save: saveEntreprise } = supaEntreprise;
   const stHistory = useSupaSTHistory(userId);
@@ -2802,13 +2822,14 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
 
   // ── PV state ──
   const NEO_LOGO = "https://raw.githubusercontent.com/Kelian-glb/cdt-assistant/main/logo.png";
-  const [pv, setPv] = useState({
-    chantier:"", chantierId:null, date:today,
+  const PV_INIT = {
+    id:null, chantier:"", chantierId:null, date:today,
     maitreOuvrage:"", maitreOuvragePresent:true, adresseChantier:"",
     maitroeuvre:"NEO SUD", sousTraitant:"", lot:"", poste:"",
     statut:"sans_reserve", travauxRestants:"", travauxAReprendre:"",
     logoUrl:"",
-  });
+  };
+  const [pv, setPv] = useState(PV_INIT);
 
   useEffect(() => {
     if (entreprise?.logo_url) setPv(p => p.logoUrl ? p : { ...p, logoUrl: entreprise.logo_url });
@@ -2952,7 +2973,12 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
     if (!savePV) return;
     setPvSavingLocal(true);
     try {
-      await savePV(pv);
+      if (pv.id && updatePV) {
+        await updatePV(pv);
+      } else {
+        const saved = await savePV(pv);
+        if (saved?.id) setPv(p => ({ ...p, id: saved.id }));
+      }
       setPvSavedLocal(true);
       setTimeout(() => setPvSavedLocal(false), 3000);
     } finally {
@@ -3142,6 +3168,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
                   </div>
                   <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
                     <button onClick={() => exportPVPDF(p, entreprise)} style={{ background:"none", border:`1px solid ${C.border}`, color:C.muted, cursor:"pointer", fontSize:11, borderRadius:6, padding:"3px 10px", fontFamily:"inherit" }}>🖨️ PDF</button>
+                    <button onClick={() => { setPv({ ...PV_INIT, ...p }); setView("pv"); }} style={{ background:"none", border:`1px solid ${C.blue}`, color:C.blue, cursor:"pointer", fontSize:11, borderRadius:6, padding:"3px 10px", fontFamily:"inherit" }}>✏️ Modifier</button>
                     <button onClick={() => delPV && delPV(p.id)} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:18, opacity:.6, lineHeight:1 }}>×</button>
                   </div>
                 </div>
@@ -3155,10 +3182,17 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
       {view === "pv" && (
         <div style={{ overflowY:"auto", display:"flex", flexDirection:"column", gap:14 }}>
 
-          {/* En-tête */}
-          <div style={{ background:C.blueL, borderRadius:12, padding:"12px 16px", fontSize:12, color:C.blue, fontWeight:600 }}>
-            📋 Procès Verbal de Réception par Lot — SAS NEO SUD CONSTRUCTION
-          </div>
+          {/* Bannière édition */}
+          {pv.id ? (
+            <div style={{ background:"#fff3cd", borderRadius:12, padding:"10px 16px", fontSize:12, color:"#856404", fontWeight:600, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span>✏️ Modification — {pv.sousTraitant || "PV"}{pv.lot ? ` · Lot ${pv.lot}` : ""}</span>
+              <button onClick={() => setPv(PV_INIT)} style={{ fontSize:11, background:"none", border:`1px solid #856404`, color:"#856404", borderRadius:6, padding:"3px 10px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>+ Nouveau PV</button>
+            </div>
+          ) : (
+            <div style={{ background:C.blueL, borderRadius:12, padding:"12px 16px", fontSize:12, color:C.blue, fontWeight:600 }}>
+              📋 Procès Verbal de Réception par Lot — SAS NEO SUD CONSTRUCTION
+            </div>
+          )}
 
           {/* Logo */}
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
