@@ -2776,7 +2776,7 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
   const { crs, saveCR, delCR } = supaCR;
-  const { pvs, savePV } = supaPV || {};
+  const { pvs, savePV, delPV } = supaPV || {};
   const { chantiers, update: updateChantier } = supaChantiers;
   const { entreprise, save: saveEntreprise } = supaEntreprise;
   const stHistory = useSupaSTHistory(userId);
@@ -2808,6 +2808,8 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
     if (entreprise?.logo_url) setPv(p => p.logoUrl ? p : { ...p, logoUrl: entreprise.logo_url });
   }, [entreprise]);
   const [pvSaving, setPvSaving] = useState(false);
+  const [pvSavingLocal, setPvSavingLocal] = useState(false);
+  const [pvSavedLocal, setPvSavedLocal] = useState(false);
   const sigMOERef = React.useRef();
   const sigSTRef  = React.useRef();
 
@@ -2940,6 +2942,18 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
     }
   };
 
+  const handleSaveOnlyPV = async () => {
+    if (!savePV) return;
+    setPvSavingLocal(true);
+    try {
+      await savePV(pv);
+      setPvSavedLocal(true);
+      setTimeout(() => setPvSavedLocal(false), 3000);
+    } finally {
+      setPvSavingLocal(false);
+    }
+  };
+
   const exportPDF = (contenu, titre) => {
     const ent_ = entreprise || {};
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/>
@@ -2999,6 +3013,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
         {tabBtn("pv", mob ? "📝 PV" : "📝 PV Réception")}
         {tabBtn("form", mob ? "✏️ CR" : "✏️ Nouveau CR")}
         {tabBtn("historique", mob ? `📚 (${(crs||[]).length})` : `📚 Historique (${(crs||[]).length})`)}
+        {tabBtn("historiquePV", mob ? `📋 PV (${(pvs||[]).length})` : `📋 PV sauvegardés (${(pvs||[]).length})`)}
       </div>
 
       {/* ── NOUVEAU CR ── */}
@@ -3088,6 +3103,45 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
               </pre>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── HISTORIQUE PV ── */}
+      {view === "historiquePV" && (
+        <div style={{ background:C.surface, borderRadius:16, border:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", flex:1 }}>
+          <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, fontSize:13, fontWeight:600 }}>
+            {(pvs||[]).length} PV sauvegardé{(pvs||[]).length!==1?"s":""}
+          </div>
+          <div style={{ overflowY:"auto", flex:1 }}>
+            {(pvs||[]).length===0 && (
+              <div style={{ color:C.muted, textAlign:"center", padding:"40px 20px", fontSize:14 }}>
+                Aucun PV sauvegardé — utilise le bouton <strong>Sauvegarder</strong> dans le formulaire PV.
+              </div>
+            )}
+            {(pvs||[]).map(p => {
+              const chan = (chantiers||[]).find(c => c.id === p.chantierId);
+              const chanNom = chan?.client || chan?.nom || "—";
+              const statutCol = p.statut==="sans_reserve" ? C.green : p.statut==="avec_reserve" ? C.orange : C.red;
+              const statutLbl = p.statut==="sans_reserve" ? "✅ Sans réserve" : p.statut==="avec_reserve" ? "⚠️ Avec réserve(s)" : "❌ Non réception";
+              return (
+                <div key={p.id} style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:600, fontSize:14, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {p.sousTraitant || "Sans titre"}{p.lot ? ` — Lot ${p.lot}` : ""}
+                    </div>
+                    <div style={{ color:C.muted, fontSize:12, marginTop:3 }}>
+                      {chanNom}{p.date ? ` · ${new Date(p.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}` : ""}
+                    </div>
+                    <div style={{ fontSize:11, color:statutCol, marginTop:2, fontWeight:500 }}>{statutLbl}</div>
+                  </div>
+                  <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
+                    <button onClick={() => exportPVPDF(p, entreprise)} style={{ background:"none", border:`1px solid ${C.border}`, color:C.muted, cursor:"pointer", fontSize:11, borderRadius:6, padding:"3px 10px", fontFamily:"inherit" }}>🖨️ PDF</button>
+                    <button onClick={() => delPV && delPV(p.id)} style={{ background:"none", border:"none", color:C.red, cursor:"pointer", fontSize:18, opacity:.6, lineHeight:1 }}>×</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -3213,12 +3267,15 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
           </div>
 
           {/* Boutons export */}
-          <div style={{ display:"flex", gap:10 }}>
+          <div style={{ display:"flex", gap:10, flexWrap: mob ? "wrap" : "nowrap" }}>
             <Btn onClick={handlePrintPV} style={{ flex:1 }}>
               🖨️ Générer le PDF
             </Btn>
+            <Btn onClick={handleSaveOnlyPV} disabled={pvSavingLocal} variant="ghost" style={{ flex:1 }}>
+              {pvSavedLocal ? "✅ Sauvegardé" : pvSavingLocal ? "Enregistrement..." : "💾 Sauvegarder"}
+            </Btn>
             <Btn onClick={handleSavePV} disabled={pvSaving || !pv.chantierId} variant="ghost" style={{ flex:1 }}>
-              {pvSaving ? "Enregistrement..." : "💾 Classer dans le chantier"}
+              {pvSaving ? "Enregistrement..." : "📁 Classer dans le chantier"}
             </Btn>
           </div>
           {!pv.chantierId && (
