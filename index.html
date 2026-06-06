@@ -981,7 +981,7 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
   <div class="row">${chk(statutNon)} &nbsp;Réception refusée ou différée</div>
 </div>
 
-<div class="no-break" style="margin-top:10px">
+<div class="no-break" style="page-break-before:always;break-before:page;padding-top:16px">
   <div style="margin-bottom:4px"><span class="lbl">Liste des travaux restant à faire :</span></div>
   <div class="travaux-box">${(pv.travauxRestants||"").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
 </div>
