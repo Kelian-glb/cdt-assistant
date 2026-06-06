@@ -923,6 +923,7 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
   const lotsHtml = LOTS_PV.map(l =>
     `<tr><td style="width:36px;text-align:center;border:1px solid #333;padding:4px 6px">${l.num}</td><td style="border:1px solid #333;padding:4px 8px">${l.label}</td></tr>`
   ).join("");
+  const hasTravauxContent = !!(pv.travauxRestants||"").trim() || !!(pv.travauxAReprendre||"").trim();
 
   const pvHtml = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><title>PV – ${pv.sousTraitant||pv.chantier||"Réception"}</title>
 <style>
@@ -981,7 +982,7 @@ function exportPVPDF(pv, entreprise, sigMOE, sigST) {
   <div class="row">${chk(statutNon)} &nbsp;Réception refusée ou différée</div>
 </div>
 
-<div class="page-break no-break" style="padding-top:20px">
+<div class="no-break" style="padding-top:20px">
   <div style="margin-bottom:5px"><span class="lbl">Liste des travaux restant à faire :</span></div>
   <div class="travaux-box">${(pv.travauxRestants||"").replace(/\n/g,"<br/>") || "&nbsp;"}</div>
 </div>
