@@ -282,6 +282,65 @@ const TABS = [
   { id: "parametres", label: "Paramètres",  icon: "⚙️" },
 ];
 
+const GO_SECTIONS = [
+  { id:"terrassement", titre:"Terrassement / Fondation", emoji:"⛏️", items:[
+    { id:"decapage",     label:"Décapage terre végétale" },
+    { id:"terr_prof",    label:"Terrassement profondeur", unite:"cm" },
+    { id:"ferraillage",  label:"Ferraillage fondation + liaisons" },
+    { id:"coulage_fond", label:"Coulage fondation", unite:"m³" },
+  ]},
+  { id:"vide_sanitaire", titre:"Vide sanitaire / Plancher bas", emoji:"🧱", items:[
+    { id:"elevation_vs",  label:"Élévation vide sanitaire (agglos 3v)" },
+    { id:"reseau_pvc",    label:"Réseau PVC évacuation" },
+    { id:"fragilite",     label:"Fragilité agglos signalée" },
+    { id:"arase_hydro",   label:"Mur périphérique + arase hydrofuge" },
+    { id:"plancher",      label:"Plancher", placeholder:"Type (ex: up23 12+5)" },
+    { id:"ferrail_sism",  label:"Ferraillage zone sismique" },
+    { id:"coulage_beton", label:"Coulage béton", unite:"m³" },
+  ]},
+  { id:"murs", titre:"Murs / Élévation", emoji:"🏛️", items:[
+    { id:"chaussee",    label:"Chaussée / traitement" },
+    { id:"type_blocs",  label:"Type de blocs", placeholder:"Ex: Porotherm 1.1 R" },
+    { id:"niveau",      label:"Niveau", placeholder:"Cote (m)" },
+    { id:"pose_mort",   label:"Pose au mortier" },
+    { id:"coffres_vre", label:"Coffres VRE" },
+    { id:"isolant",     label:"Isolation polystyrène" },
+  ]},
+  { id:"escalier", titre:"Escalier", emoji:"🪜", items:[
+    { id:"dims_esc",    label:"Hauteur / marches", placeholder:"ex: H=2.80m / 14 marches" },
+    { id:"corps_trem",  label:"Corps de tremblement" },
+    { id:"realisation", label:"Réalisation conforme" },
+    { id:"dryfix",      label:"Joint dryfix" },
+  ]},
+  { id:"charpente", titre:"Charpente bois", emoji:"🪵", items:[
+    { id:"type_charp",  label:"Type", placeholder:"Fermettes / Traditionnel" },
+    { id:"orient",      label:"Orientation", placeholder:"ex: versant Sud" },
+    { id:"chevrons",    label:"Pannes / Chevrons" },
+    { id:"fixation",    label:"Fixation (clous / dryfix)" },
+    { id:"nettoyage_c", label:"Nettoyage charpente" },
+  ]},
+  { id:"couverture", titre:"Couverture", emoji:"🏠", items:[
+    { id:"type_tuile",  label:"Type tuile", placeholder:"Ex: Tuile ronde" },
+    { id:"galerie",     label:"Galerie", placeholder:"Dimension (cm)" },
+    { id:"access_fai",  label:"Accessoires + faîtage sikaflex" },
+    { id:"nettoyage_t", label:"Nettoyage couverture" },
+  ]},
+  { id:"divers", titre:"Divers / VRD", emoji:"🔧", items:[
+    { id:"vrd",         label:"VRD réalisés" },
+    { id:"prot_aciers", label:"Protection aciers" },
+    { id:"echafaud",    label:"Échafaudage conforme" },
+  ]},
+];
+
+const GO_STATUT = {
+  "":        { label:"—",           bg:"#f2f2f7", color:"#aeaeb2" },
+  "fait":    { label:"✅ Conforme", bg:"#e8fff0", color:"#30d158" },
+  "cours":   { label:"⏳ En cours", bg:"#fff8e6", color:"#ff9500" },
+  "non":     { label:"❌ Non-conf.", bg:"#fff0f0", color:"#ff3b30" },
+  "na":      { label:"N/A",         bg:"#f2f2f7", color:"#8e8e93" },
+};
+const GO_STATUT_CYCLE = { "":"fait", "fait":"cours", "cours":"non", "non":"na", "na":"" };
+
 const STATUS_COLORS = {
   "En cours":   "#30d158",
   "En attente": "#ff9500",
@@ -1775,6 +1834,54 @@ function ChecklistPanel({ chantier, onUpdate, modeles }) {
   );
 }
 
+function exportRapportGOPDF(go, entreprise) {
+  const dateStr = go.date ? new Date(go.date+"T12:00").toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}) : "—";
+  const S = { "":"—", "fait":"✅ Conforme", "cours":"⏳ En cours", "non":"❌ Non-conf.", "na":"N/A" };
+  const SC = { "":"#888", "fait":"#30d158", "cours":"#ff9500", "non":"#ff3b30", "na":"#888" };
+
+  const sectionsHtml = GO_SECTIONS.map(sec => {
+    const secData = go.sections[sec.id] || { items:{}, obs:"" };
+    const rows = sec.items.map(item => {
+      const d = secData.items[item.id] || {};
+      const st = d.statut || "";
+      const val = d.valeur ? ` <span style="color:#0071e3;font-weight:600">${d.valeur}${item.unite?" "+item.unite:""}</span>` : "";
+      const note = d.note ? `<div style="font-size:11px;color:#6d6d72;margin-top:2px">${d.note}</div>` : "";
+      return `<tr>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5ea;font-size:13px">${item.label}${val}${note}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5ea;text-align:center;font-size:12px;font-weight:600;color:${SC[st]};white-space:nowrap">${S[st]}</td>
+      </tr>`;
+    }).join("");
+    const obsHtml = secData.obs ? `<div style="background:#f5f4f0;border-radius:8px;padding:8px 12px;font-size:12px;color:#3d3530;margin-top:8px"><strong>Observations :</strong> ${secData.obs}</div>` : "";
+    return `<div style="margin-bottom:22px">
+      <h2 style="font-size:14px;font-weight:700;color:#1c1c1e;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid #f5f4f0">${sec.emoji} ${sec.titre}</h2>
+      <table style="width:100%;border-collapse:collapse">
+        <colgroup><col style="width:75%"><col style="width:25%"></colgroup>
+        ${rows}
+      </table>
+      ${obsHtml}
+    </div>`;
+  }).join("");
+
+  const html = `
+${buildEnteteHTML(entreprise)}
+<h1 style="font-size:20px;margin:0 0 4px">Rapport de chantier — Gros Œuvre</h1>
+<div style="color:#6d6d72;font-size:13px;margin-bottom:20px">${go.client||go.chantier||""} · ${dateStr}</div>
+
+<div style="background:#f5f4f0;border-radius:10px;padding:12px 16px;margin-bottom:22px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+  <div><span style="color:#6d6d72;font-size:11px">CLIENT</span><br/><strong style="font-size:13px">${go.client||"—"}</strong></div>
+  <div><span style="color:#6d6d72;font-size:11px">CHANTIER</span><br/><strong style="font-size:13px">${go.chantier||"—"}</strong></div>
+  <div><span style="color:#6d6d72;font-size:11px">DÉMARRAGE</span><br/><strong style="font-size:13px">${go.dateDemarrage||"—"}</strong></div>
+  <div><span style="color:#6d6d72;font-size:11px">ZONE SISMIQUE</span><br/><strong style="font-size:13px">${go.zoneSismique||"—"}</strong></div>
+  <div><span style="color:#6d6d72;font-size:11px">ÉTUDE SOL</span><br/><strong style="font-size:13px">${go.etudeSol||"—"}</strong></div>
+  <div><span style="color:#6d6d72;font-size:11px">DATE RAPPORT</span><br/><strong style="font-size:13px">${dateStr}</strong></div>
+</div>
+
+${sectionsHtml}
+<div class="footer"><span>${entreprise?.nom||"Bâtir"} — Rapport GO</span><span>${go.client||go.chantier||""} · ${new Date().toLocaleDateString("fr-FR")}</span></div>
+  `;
+  openPDF(html, `Rapport GO – ${go.client||go.chantier||"chantier"}`);
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // TAB 0 — TABLEAU DE BORD
 // ══════════════════════════════════════════════════════════════════════════
@@ -2773,7 +2880,28 @@ function TabCR({ userId, supaCR, supaPV, supaChantiers, supaEntreprise, supaLogo
   const { entreprise, save: saveEntreprise } = supaEntreprise;
   const stHistory = useSupaSTHistory(userId);
 
-  const [view, setView] = useState("pv"); // "form" | "historique" | "pv" | "entreprise"
+  const [view, setView] = useState("pv"); // "form" | "historique" | "pv" | "entreprise" | "rapport_go"
+
+  // ── Rapport GO state ──
+  const mkGoSections = () => Object.fromEntries(GO_SECTIONS.map(s => [
+    s.id, { items: Object.fromEntries(s.items.map(i => [i.id, { statut:"", valeur:"", note:"" }])), obs:"" }
+  ]));
+  const GO_INIT = { chantier:"", chantierId:null, date:today, client:"", adresse:"", dateDemarrage:"", zoneSismique:"3", etudeSol:"G2", sections: mkGoSections() };
+  const [go, setGo] = useState(GO_INIT);
+
+  const setGoField = (k, v) => setGo(g => ({ ...g, [k]: v }));
+  const setGoItem = (secId, itemId, key, val) => setGo(g => ({
+    ...g, sections: { ...g.sections, [secId]: { ...g.sections[secId], items: {
+      ...g.sections[secId].items, [itemId]: { ...g.sections[secId].items[itemId], [key]: val }
+    }}}
+  }));
+  const setGoObs = (secId, val) => setGo(g => ({
+    ...g, sections: { ...g.sections, [secId]: { ...g.sections[secId], obs: val } }
+  }));
+  const cycleGoStatut = (secId, itemId) => {
+    const cur = go.sections[secId]?.items[itemId]?.statut || "";
+    setGoItem(secId, itemId, "statut", GO_STATUT_CYCLE[cur]);
+  };
 
   // ── CR state ──
   const [cr, setCr] = useState({
@@ -3012,6 +3140,7 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
         {tabBtn("form", mob ? "✏️ CR" : "✏️ Nouveau CR")}
         {tabBtn("historique", mob ? `📚 (${(crs||[]).length})` : `📚 Historique (${(crs||[]).length})`)}
         {tabBtn("historiquePV", mob ? `📋 PV (${(pvs||[]).length})` : `📋 PV sauvegardés (${(pvs||[]).length})`)}
+        {tabBtn("rapport_go", mob ? "🏗️ GO" : "🏗️ Rapport GO")}
       </div>
 
       {/* ── NOUVEAU CR ── */}
@@ -3291,6 +3420,120 @@ Document établi par ${cr.conducteurTravaux} – ${d}`);
           )}
         </div>
       )}
+
+      {/* ── RAPPORT GROS ŒUVRE ── */}
+      {view === "rapport_go" && (() => {
+        const iS = { background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:10, padding:"9px 12px", fontSize:13, fontFamily:"inherit", color:C.text, outline:"none", width:"100%", boxSizing:"border-box" };
+        const fieldBlock = (label, child) => (
+          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+            <label style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:".06em" }}>{label}</label>
+            {child}
+          </div>
+        );
+
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+            {/* ─ En-tête chantier ─ */}
+            <div style={{ background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:14, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span>🏗️ Informations chantier</span>
+                <button onClick={() => exportRapportGOPDF(go, entreprise)} style={{ background:"#0071e3", color:"#fff", border:"none", borderRadius:10, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                  ⬇ Exporter PDF
+                </button>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:10 }}>
+                {fieldBlock("Client / Maître d'ouvrage",
+                  <input style={iS} value={go.client} onChange={e => setGoField("client", e.target.value)} placeholder="ex: M. HOUADOU MME VERRIER" />
+                )}
+                {fieldBlock("Chantier / Adresse",
+                  <input style={iS} value={go.chantier} onChange={e => setGoField("chantier", e.target.value)} placeholder="ex: Chantier Saint Gervasy lot 19" />
+                )}
+                {fieldBlock("Date de démarrage",
+                  <input type="date" style={iS} value={go.dateDemarrage} onChange={e => setGoField("dateDemarrage", e.target.value)} />
+                )}
+                {fieldBlock("Date du rapport",
+                  <input type="date" style={iS} value={go.date} onChange={e => setGoField("date", e.target.value)} />
+                )}
+                {fieldBlock("Zone sismique",
+                  <select style={iS} value={go.zoneSismique} onChange={e => setGoField("zoneSismique", e.target.value)}>
+                    {["1","2","3","4","5"].map(z => <option key={z} value={z}>Zone {z}</option>)}
+                  </select>
+                )}
+                {fieldBlock("Étude sol",
+                  <input style={iS} value={go.etudeSol} onChange={e => setGoField("etudeSol", e.target.value)} placeholder="ex: G2, G3..." />
+                )}
+              </div>
+            </div>
+
+            {/* ─ Sections ─ */}
+            {GO_SECTIONS.map(sec => {
+              const secData = go.sections[sec.id] || { items:{}, obs:"" };
+              return (
+                <div key={sec.id} style={{ background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:12, paddingBottom:10, borderBottom:`1px solid ${C.border}` }}>
+                    {sec.emoji} {sec.titre}
+                  </div>
+
+                  <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                    {sec.items.map(item => {
+                      const d = secData.items[item.id] || { statut:"", valeur:"", note:"" };
+                      const st = d.statut || "";
+                      const badge = GO_STATUT[st] || GO_STATUT[""];
+                      return (
+                        <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", borderRadius:10, background: st ? badge.bg+"33" : "transparent" }}>
+                          {/* Bouton statut */}
+                          <button
+                            onClick={() => cycleGoStatut(sec.id, item.id)}
+                            title="Cliquer pour changer le statut"
+                            style={{ flexShrink:0, background: badge.bg, color: badge.color, border:`1.5px solid ${badge.color}40`, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", minWidth:90, textAlign:"center" }}>
+                            {badge.label}
+                          </button>
+
+                          {/* Label */}
+                          <div style={{ flex:1, fontSize:13, color:C.text, fontWeight: st==="non" ? 600 : 400 }}>
+                            {item.label}
+                          </div>
+
+                          {/* Valeur (quantité ou texte libre) */}
+                          {(item.unite || item.placeholder) && (
+                            <input
+                              value={d.valeur}
+                              onChange={e => setGoItem(sec.id, item.id, "valeur", e.target.value)}
+                              placeholder={item.unite ? `0 ${item.unite}` : (item.placeholder||"")}
+                              style={{ width: item.unite ? 90 : 140, background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:8, padding:"5px 9px", fontSize:12, fontFamily:"inherit", color:C.text, outline:"none" }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Note de section */}
+                  <textarea
+                    value={secData.obs}
+                    onChange={e => setGoObs(sec.id, e.target.value)}
+                    placeholder="Observations / remarques de section..."
+                    rows={2}
+                    style={{ marginTop:10, width:"100%", background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:10, padding:"9px 12px", fontSize:12, fontFamily:"inherit", color:C.text, outline:"none", resize:"vertical", boxSizing:"border-box" }}
+                  />
+                </div>
+              );
+            })}
+
+            {/* ─ Bouton export bas ─ */}
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={() => setGo({ ...GO_INIT, sections: mkGoSections(), date:today })} style={{ flex:1, background:C.surface2, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px", fontSize:13, fontWeight:500, cursor:"pointer", fontFamily:"inherit", color:C.muted }}>
+                🗑️ Réinitialiser
+              </button>
+              <button onClick={() => exportRapportGOPDF(go, entreprise)} style={{ flex:2, background:"#0071e3", color:"#fff", border:"none", borderRadius:10, padding:"10px", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+                ⬇ Exporter PDF
+              </button>
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* ── MON ENTREPRISE ── */}
       {view === "entreprise" && (
