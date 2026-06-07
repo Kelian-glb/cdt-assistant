@@ -297,7 +297,14 @@ const GO_SECTIONS = [
     { id:"ferrail_sism",  label:"Ferraillage zone sismique" },
     { id:"coulage_beton", label:"Coulage béton", unite:"m³" },
   ]},
-  { id:"murs", titre:"Murs / Élévation", emoji:"🏛️", items:[
+  { id:"elevation", titre:"Murs — Élévation", emoji:"🏛️", items:[
+    { id:"type_blocs",  label:"Type de blocs", placeholder:"Ex: Porotherm 1.1 R" },
+    { id:"niveau",      label:"Niveau", placeholder:"Cote (m)" },
+    { id:"pose_mort",   label:"Pose au mortier" },
+    { id:"coffres_vre", label:"Coffres VRE" },
+    { id:"isolant",     label:"Isolation polystyrène" },
+  ]},
+  { id:"etage", titre:"Murs — Étage", emoji:"🏗️", items:[
     { id:"type_blocs",  label:"Type de blocs", placeholder:"Ex: Porotherm 1.1 R" },
     { id:"niveau",      label:"Niveau", placeholder:"Cote (m)" },
     { id:"pose_mort",   label:"Pose au mortier" },
