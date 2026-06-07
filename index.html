@@ -4997,29 +4997,82 @@ function TabDocuments() {
 }
 
 // ── Tab Rapports ───────────────────────────────────────────────────────────
-function TabRapports({ supaEntreprise }) {
+function TabRapports({ supaEntreprise, supaChantiers }) {
   const mob = useIsMobile();
   const today = new Date().toISOString().split("T")[0];
   const { entreprise } = supaEntreprise || {};
+  const { chantiers } = supaChantiers || {};
 
   const mkGoSections = () => Object.fromEntries(GO_SECTIONS.map(s => [
     s.id, { items: Object.fromEntries(s.items.map(i => [i.id, { statut:"", valeur:"", note:"" }])), obs:"" }
   ]));
-  const GO_INIT = { chantier:"", date:today, client:"", dateDemarrage:"", zoneSismique:"3", etudeSol:"G2", sections: mkGoSections() };
-  const [go, setGo] = useState(GO_INIT);
+  const blankGo = () => ({ chantier:"", date:today, client:"", dateDemarrage:"", zoneSismique:"3", etudeSol:"G2", sections: mkGoSections() });
+
+  const [chantierId, setChantierId] = useState(null);
+  const [go, setGo] = useState(blankGo);
+  const [flashSaved, setFlashSaved] = useState(false);
+  const firstRender = useRef(true);
+  const flashTimer = useRef(null);
+
+  // Charge le rapport sauvegardé quand on sélectionne un chantier
+  const handleSelectChantier = (id) => {
+    firstRender.current = true;
+    setChantierId(id || null);
+    if (id) {
+      const saved = _ldb.get("rapport_go_" + id);
+      if (saved) {
+        // Fusionne avec les sections actuelles (gère ajouts/suppressions d'items)
+        const merged = mkGoSections();
+        Object.entries(saved.sections || {}).forEach(([sid, sd]) => {
+          if (!merged[sid]) return;
+          merged[sid].obs = sd.obs || "";
+          Object.entries(sd.items || {}).forEach(([iid, iv]) => {
+            if (merged[sid].items[iid]) merged[sid].items[iid] = iv;
+          });
+        });
+        setGo({ ...blankGo(), ...saved, sections: merged });
+      } else {
+        const chan = (chantiers||[]).find(c => c.id === id);
+        setGo({ ...blankGo(), date: today,
+          client: chan?.client || "",
+          chantier: [chan?.nom, chan?.commune].filter(Boolean).join(" – "),
+        });
+      }
+    } else {
+      setGo(blankGo());
+    }
+    setFlashSaved(false);
+  };
+
+  // Auto-save avec debounce 800ms à chaque modification
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    if (!chantierId) return;
+    const t = setTimeout(() => {
+      _ldb.set("rapport_go_" + chantierId, go);
+      setFlashSaved(true);
+      clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlashSaved(false), 2000);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [go]);
 
   const setGoField = (k, v) => setGo(g => ({ ...g, [k]: v }));
-  const setGoItem = (secId, itemId, key, val) => setGo(g => ({
-    ...g, sections: { ...g.sections, [secId]: { ...g.sections[secId], items: {
-      ...g.sections[secId].items, [itemId]: { ...g.sections[secId].items[itemId], [key]: val }
+  const setGoItem  = (sid, iid, key, val) => setGo(g => ({
+    ...g, sections: { ...g.sections, [sid]: { ...g.sections[sid], items: {
+      ...g.sections[sid].items, [iid]: { ...g.sections[sid].items[iid], [key]: val }
     }}}
   }));
-  const setGoObs = (secId, val) => setGo(g => ({
-    ...g, sections: { ...g.sections, [secId]: { ...g.sections[secId], obs: val } }
+  const setGoObs = (sid, val) => setGo(g => ({
+    ...g, sections: { ...g.sections, [sid]: { ...g.sections[sid], obs: val } }
   }));
-  const cycleGoStatut = (secId, itemId) => {
-    const cur = go.sections[secId]?.items[itemId]?.statut || "";
-    setGoItem(secId, itemId, "statut", GO_STATUT_CYCLE[cur]);
+  const cycleGoStatut = (sid, iid) => {
+    const cur = go.sections[sid]?.items[iid]?.statut || "";
+    setGoItem(sid, iid, "statut", GO_STATUT_CYCLE[cur]);
+  };
+  const handleReset = () => {
+    setGo(blankGo());
+    if (chantierId) _ldb.set("rapport_go_" + chantierId, null);
   };
 
   const iS = { background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:10, padding:"9px 12px", fontSize:13, fontFamily:"inherit", color:C.text, outline:"none", width:"100%", boxSizing:"border-box" };
@@ -5033,90 +5086,106 @@ function TabRapports({ supaEntreprise }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-      {/* ─ En-tête chantier ─ */}
+      {/* ─ Sélecteur chantier ─ */}
       <div style={{ background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
         <div style={{ fontSize:mob?16:18, fontWeight:700, color:C.text, marginBottom:4, letterSpacing:"-.02em" }}>Rapport de chantier — Gros Œuvre</div>
-        <div style={{ fontSize:12, color:C.muted, marginBottom:16 }}>Remplis les sections puis exporte en PDF.</div>
-        <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:10 }}>
-          {fieldBlock("Client / Maître d'ouvrage",
-            <input style={iS} value={go.client} onChange={e => setGoField("client", e.target.value)} placeholder="ex: M. HOUADOU MME VERRIER" />
-          )}
-          {fieldBlock("Chantier / Adresse",
-            <input style={iS} value={go.chantier} onChange={e => setGoField("chantier", e.target.value)} placeholder="ex: Chantier Saint Gervasy lot 19" />
-          )}
-          {fieldBlock("Date de démarrage",
-            <input type="date" style={iS} value={go.dateDemarrage} onChange={e => setGoField("dateDemarrage", e.target.value)} />
-          )}
-          {fieldBlock("Date du rapport",
-            <input type="date" style={iS} value={go.date} onChange={e => setGoField("date", e.target.value)} />
-          )}
-          {fieldBlock("Zone sismique",
-            <select style={iS} value={go.zoneSismique} onChange={e => setGoField("zoneSismique", e.target.value)}>
-              {["1","2","3","4","5"].map(z => <option key={z} value={z}>Zone {z}</option>)}
-            </select>
-          )}
-          {fieldBlock("Étude sol",
-            <input style={iS} value={go.etudeSol} onChange={e => setGoField("etudeSol", e.target.value)} placeholder="ex: G2, G3..." />
-          )}
-        </div>
-      </div>
-
-      {/* ─ Sections ─ */}
-      {GO_SECTIONS.map(sec => {
-        const secData = go.sections[sec.id] || { items:{}, obs:"" };
-        return (
-          <div key={sec.id} style={{ background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:12, paddingBottom:10, borderBottom:`1px solid ${C.border}` }}>
-              {sec.emoji} {sec.titre}
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
-              {sec.items.map(item => {
-                const d = secData.items[item.id] || { statut:"", valeur:"", note:"" };
-                const st = d.statut || "";
-                const badge = GO_STATUT[st] || GO_STATUT[""];
-                return (
-                  <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", borderRadius:10, background: st ? badge.bg+"33" : "transparent" }}>
-                    <button
-                      onClick={() => cycleGoStatut(sec.id, item.id)}
-                      title="Cliquer pour changer le statut"
-                      style={{ flexShrink:0, background:badge.bg, color:badge.color, border:`1.5px solid ${badge.color}40`, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", minWidth:90, textAlign:"center" }}>
-                      {badge.label}
-                    </button>
-                    <div style={{ flex:1, fontSize:13, color:C.text, fontWeight: st==="non" ? 600 : 400 }}>
-                      {item.label}
-                    </div>
-                    {(item.unite || item.placeholder) && (
-                      <input
-                        value={d.valeur}
-                        onChange={e => setGoItem(sec.id, item.id, "valeur", e.target.value)}
-                        placeholder={item.unite ? `0 ${item.unite}` : (item.placeholder||"")}
-                        style={{ width: item.unite ? 90 : 140, background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:8, padding:"5px 9px", fontSize:12, fontFamily:"inherit", color:C.text, outline:"none" }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <textarea
-              value={secData.obs}
-              onChange={e => setGoObs(sec.id, e.target.value)}
-              placeholder="Observations / remarques..."
-              rows={2}
-              style={{ marginTop:10, width:"100%", background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:10, padding:"9px 12px", fontSize:12, fontFamily:"inherit", color:C.text, outline:"none", resize:"vertical", boxSizing:"border-box" }}
-            />
+        <div style={{ fontSize:12, color:C.muted, marginBottom:14 }}>Sélectionne un chantier pour charger ou créer son rapport. Les modifications sont sauvegardées automatiquement.</div>
+        {fieldBlock("Chantier",
+          <select style={iS} value={chantierId || ""} onChange={e => handleSelectChantier(e.target.value || null)}>
+            <option value="">— Sélectionner un chantier —</option>
+            {(chantiers||[]).map(c => (
+              <option key={c.id} value={c.id}>{[c.nom||c.client, c.commune].filter(Boolean).join(" – ")}</option>
+            ))}
+          </select>
+        )}
+        {chantierId && (
+          <div style={{ marginTop:10, fontSize:12, color: flashSaved ? "#30d158" : C.muted, fontWeight: flashSaved ? 600 : 400, transition:"color .4s" }}>
+            {flashSaved ? "✅ Sauvegardé automatiquement" : "💾 Sauvegarde automatique activée"}
           </div>
-        );
-      })}
-
-      {/* ─ Actions ─ */}
-      <div style={{ display:"flex", gap:10 }}>
-        <button onClick={() => setGo({ ...GO_INIT, sections: mkGoSections(), date:today })} style={{ flex:1, background:C.surface2, border:`1px solid ${C.border}`, borderRadius:10, padding:"11px", fontSize:13, fontWeight:500, cursor:"pointer", fontFamily:"inherit", color:C.muted }}>
-          🗑️ Réinitialiser
-        </button>
-        <button onClick={() => exportRapportGOPDF(go, entreprise)} style={{ flex:2, background:"#0071e3", color:"#fff", border:"none", borderRadius:10, padding:"11px", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
-          ⬇ Exporter PDF
-        </button>
+        )}
       </div>
+
+      {/* ─ Formulaire (si chantier sélectionné) ─ */}
+      {chantierId ? (<>
+
+        <div style={{ background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:12 }}>Informations</div>
+          <div style={{ display:"grid", gridTemplateColumns: mob?"1fr":"1fr 1fr", gap:10 }}>
+            {fieldBlock("Client / Maître d'ouvrage",
+              <input style={iS} value={go.client} onChange={e => setGoField("client", e.target.value)} placeholder="ex: M. HOUADOU MME VERRIER" />
+            )}
+            {fieldBlock("Adresse chantier",
+              <input style={iS} value={go.chantier} onChange={e => setGoField("chantier", e.target.value)} placeholder="ex: Chantier Saint Gervasy lot 19" />
+            )}
+            {fieldBlock("Date de démarrage",
+              <input type="date" style={iS} value={go.dateDemarrage} onChange={e => setGoField("dateDemarrage", e.target.value)} />
+            )}
+            {fieldBlock("Date du rapport",
+              <input type="date" style={iS} value={go.date} onChange={e => setGoField("date", e.target.value)} />
+            )}
+            {fieldBlock("Zone sismique",
+              <select style={iS} value={go.zoneSismique} onChange={e => setGoField("zoneSismique", e.target.value)}>
+                {["1","2","3","4","5"].map(z => <option key={z} value={z}>Zone {z}</option>)}
+              </select>
+            )}
+            {fieldBlock("Étude sol",
+              <input style={iS} value={go.etudeSol} onChange={e => setGoField("etudeSol", e.target.value)} placeholder="ex: G2, G3..." />
+            )}
+          </div>
+        </div>
+
+        {GO_SECTIONS.map(sec => {
+          const secData = go.sections[sec.id] || { items:{}, obs:"" };
+          return (
+            <div key={sec.id} style={{ background:C.surface, borderRadius:16, padding:20, border:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:12, paddingBottom:10, borderBottom:`1px solid ${C.border}` }}>
+                {sec.emoji} {sec.titre}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                {sec.items.map(item => {
+                  const d = secData.items[item.id] || { statut:"", valeur:"", note:"" };
+                  const st = d.statut || "";
+                  const badge = GO_STATUT[st] || GO_STATUT[""];
+                  return (
+                    <div key={item.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 10px", borderRadius:10, background: st ? badge.bg+"33" : "transparent" }}>
+                      <button onClick={() => cycleGoStatut(sec.id, item.id)} title="Changer le statut"
+                        style={{ flexShrink:0, background:badge.bg, color:badge.color, border:`1.5px solid ${badge.color}40`, borderRadius:8, padding:"4px 10px", fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", minWidth:90, textAlign:"center" }}>
+                        {badge.label}
+                      </button>
+                      <div style={{ flex:1, fontSize:13, color:C.text, fontWeight: st==="non" ? 600 : 400 }}>{item.label}</div>
+                      {(item.unite || item.placeholder) && (
+                        <input value={d.valeur} onChange={e => setGoItem(sec.id, item.id, "valeur", e.target.value)}
+                          placeholder={item.unite ? `0 ${item.unite}` : (item.placeholder||"")}
+                          style={{ width: item.unite ? 90 : 140, background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:8, padding:"5px 9px", fontSize:12, fontFamily:"inherit", color:C.text, outline:"none" }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <textarea value={secData.obs} onChange={e => setGoObs(sec.id, e.target.value)}
+                placeholder="Observations / remarques..."
+                rows={2}
+                style={{ marginTop:10, width:"100%", background:C.surface2, border:`1.5px solid ${C.border}`, borderRadius:10, padding:"9px 12px", fontSize:12, fontFamily:"inherit", color:C.text, outline:"none", resize:"vertical", boxSizing:"border-box" }}
+              />
+            </div>
+          );
+        })}
+
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={handleReset} style={{ flex:1, background:C.surface2, border:`1px solid ${C.border}`, borderRadius:10, padding:"11px", fontSize:13, fontWeight:500, cursor:"pointer", fontFamily:"inherit", color:C.muted }}>
+            🗑️ Réinitialiser
+          </button>
+          <button onClick={() => exportRapportGOPDF(go, entreprise)} style={{ flex:2, background:"#0071e3", color:"#fff", border:"none", borderRadius:10, padding:"11px", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+            ⬇ Exporter PDF
+          </button>
+        </div>
+
+      </>) : (
+        <div style={{ background:C.surface, borderRadius:16, padding:"40px 20px", border:`1px solid ${C.border}`, textAlign:"center", color:C.muted, fontSize:13 }}>
+          Sélectionne un chantier ci-dessus pour commencer ou reprendre son rapport.
+        </div>
+      )}
 
     </div>
   );
@@ -5399,7 +5468,7 @@ function App() {
           {tab === "cr"         && <TabCR userId={user.id} supaCR={supaCR} supaPV={supaPV} supaChantiers={supaChantiers} supaEntreprise={supaEntreprise} supaLogos={supaLogos} />}
           {tab === "calculs"    && <TabCalculs supaMetres={supaMetres} />}
           {tab === "documents"  && <TabDocuments />}
-          {tab === "rapports"   && <TabRapports supaEntreprise={supaEntreprise} />}
+          {tab === "rapports"   && <TabRapports supaEntreprise={supaEntreprise} supaChantiers={supaChantiers} />}
           {tab === "parametres" && <TabStub label="Paramètres" icon="⚙️" desc="Configuration de l'application." />}
         </div>
         {mob && (
